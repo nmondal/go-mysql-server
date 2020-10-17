@@ -28,16 +28,14 @@ func main() {
 	engine.AddDatabase(createTestDatabase())
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// register udf ECMAScript Function ....
-	metaFunction := udf.ScriptUDF{Id: "HHGG", Lang: "js", Body: "console.log($[0]); mytable.name.length"}
-	ecmaScriptFunction := metaFunction.AsFunction()
-	re := engine.Catalog.FunctionRegistry.Register(ecmaScriptFunction)
-	if re != nil {
-		fmt.Println("Error !!! ")
-		fmt.Println(re)
-	}
+	f1 := udf.ScriptUDF{Id: "f1", Lang: "js", Body: "console.log($[0]); mytable.name.length"}
+	_ = f1.Register(engine)
+	f2 := udf.ScriptUDF{Id: "f2", Lang: "js", Body: "mytable.phone_numbers.length"}
+	_ = f2.Register(engine)
+
 	// now query
 	ctx := sql.NewEmptyContext()
-	_, it, e := engine.Query(ctx, "SELECT HHGG(name) FROM mytable")
+	_, it, e := engine.Query(ctx, "SELECT f1(name) , f2(phone_numbers) FROM mytable")
 	if e != nil {
 		fmt.Println("Error !!! ")
 		fmt.Println(e)

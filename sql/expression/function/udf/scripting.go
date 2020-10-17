@@ -3,6 +3,7 @@ package udf
 import (
 	"fmt"
 	"github.com/robertkrimen/otto"
+	sqle "github.com/src-d/go-mysql-server"
 	"github.com/src-d/go-mysql-server/sql"
 	"regexp"
 	"strings"
@@ -25,6 +26,10 @@ func (s *ScriptUDF) Fn(args ...sql.Expression) (sql.Expression, error) {
 
 func (s *ScriptUDF) AsFunction() sql.FunctionN {
 	return sql.FunctionN{Name: strings.ToLower(s.Id), Fn: s.Fn}
+}
+
+func (s *ScriptUDF) Register(engine *sqle.Engine) error {
+	return engine.Catalog.FunctionRegistry.Register(s.AsFunction())
 }
 
 func (a *Scriptable) Children() []sql.Expression {

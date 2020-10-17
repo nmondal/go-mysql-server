@@ -38,13 +38,8 @@ func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row) (interface{}, erro
 	return value, err
 }
 
-// NewScriptECMA creates a new Scriptable node.
-func NewScriptECMA(args ...sql.Expression) *Scriptable {
-	return &Scriptable{args: args}
-}
-
 func (a *Scriptable) String() string {
-	return fmt.Sprintf("$%s($row)", a.Meta.Id)
+	return fmt.Sprintf("%s(...)", strings.ToLower(a.Meta.Id))
 }
 
 // Resolved implements AggregationExpression interface. (AggregationExpression[Expression[Resolvable]]])
@@ -69,7 +64,7 @@ func (a *Scriptable) Eval(ctx *sql.Context, buffer sql.Row) (interface{}, error)
 
 // WithChildren implements the Expression interface.
 func (a *Scriptable) WithChildren(children ...sql.Expression) (sql.Expression, error) {
-	return NewScriptECMA(children...), nil
+	return &Scriptable{args: children, Meta: a.Meta}, nil
 }
 
 // NewBuffer implements AggregationExpression interface. (AggregationExpression)

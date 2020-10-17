@@ -1,6 +1,7 @@
 package sqle
 
 import (
+	"github.com/src-d/go-mysql-server/sql/expression/function/udf"
 	"time"
 
 	"github.com/go-kit/kit/metrics/discard"
@@ -93,6 +94,25 @@ func NewDefault() *Engine {
 	a := analyzer.NewDefault(c)
 
 	return New(c, a, nil)
+}
+
+func (e *Engine) RegisterUDF(scriptUDF udf.ScriptUDF) error {
+	return e.Catalog.FunctionRegistry.Register(scriptUDF.AsFunction())
+}
+
+// SQuery executes a Script based query
+func (e *Engine) SQuery(
+	ctx *sql.Context,
+	query string,
+) (sql.Schema, sql.RowIter, error) {
+	processedQuery, customFunctions := udf.MacroProcessor(query)
+	if customFunctions != nil {
+		// now fill up the UDFs...
+		for i := 0; i < len(customFunctions); i++ {
+			_ = e.RegisterUDF(customFunctions[i])
+		}
+	}
+	return e.Query(ctx, processedQuery)
 }
 
 // Query executes a query.

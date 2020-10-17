@@ -3,7 +3,6 @@ package udf
 import (
 	"fmt"
 	"github.com/robertkrimen/otto"
-	sqle "github.com/src-d/go-mysql-server"
 	"github.com/src-d/go-mysql-server/sql"
 	"regexp"
 	"strings"
@@ -20,16 +19,51 @@ type Scriptable struct {
 	args []sql.Expression
 }
 
+// This finds the match for where there is an UDF to be created
+var UdfRegex = regexp.MustCompile(`<:([^(<:)^(:>)]+):>`)
+
+// within UDF this does parameter extraction
+var ParamRegex = regexp.MustCompile(`@{([^(@{)^}]+)}`)
+
+func MacroProcessor(query string) (string, []ScriptUDF) {
+	list := UdfRegex.FindAllStringSubmatch(query, -1)
+	N := len(list)
+	if N == 0 {
+		return query, nil
+	}
+	retString := query
+	udfArray := make([]ScriptUDF, N)
+	for i := 0; i < N; i++ {
+		actual := list[i][0]
+		expr := list[i][1]
+		myParams := ParamRegex.FindAllStringSubmatch(expr, -1)
+		paramNameMap := make(map[string]bool)
+		for j := 0; j < len(myParams); j++ {
+			matchString := myParams[j][0]
+			paramString := myParams[j][1]
+			paramNameMap[paramString] = true
+			expr = strings.Replace(expr, matchString, paramString, 1)
+		}
+		udfName := fmt.Sprintf("_auto_%d_udf_", i+1)
+		paramNames := make([]string, len(paramNameMap))
+		k := 0
+		for n := range paramNameMap {
+			paramNames[k] = n
+			k++
+		}
+		udfCall := fmt.Sprintf("%s(%s)", udfName, strings.Join(paramNames, ","))
+		udfArray[i] = ScriptUDF{Id: udfName, Lang: "js", Body: expr}
+		retString = strings.Replace(retString, actual, udfCall, 1)
+	}
+	return retString, udfArray
+}
+
 func (s *ScriptUDF) Fn(args ...sql.Expression) (sql.Expression, error) {
 	return &Scriptable{s, args}, nil
 }
 
 func (s *ScriptUDF) AsFunction() sql.FunctionN {
 	return sql.FunctionN{Name: strings.ToLower(s.Id), Fn: s.Fn}
-}
-
-func (s *ScriptUDF) Register(engine *sqle.Engine) error {
-	return engine.Catalog.FunctionRegistry.Register(s.AsFunction())
 }
 
 func (a *Scriptable) Children() []sql.Expression {

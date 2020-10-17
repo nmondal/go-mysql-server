@@ -1,13 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	sqle "github.com/src-d/go-mysql-server"
-	"github.com/src-d/go-mysql-server/auth"
 	"github.com/src-d/go-mysql-server/memory"
-	"github.com/src-d/go-mysql-server/server"
 	"github.com/src-d/go-mysql-server/sql"
+	"github.com/src-d/go-mysql-server/sql/expression/function/udf"
 )
 
 // Example of how to implement a MySQL server based on a Engine:
@@ -27,19 +27,40 @@ func main() {
 	engine := sqle.NewDefault()
 	engine.AddDatabase(createTestDatabase())
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
-
-	config := server.Config{
-		Protocol: "tcp",
-		Address:  "localhost:3306",
-		Auth:     auth.NewNativeSingle("root", "", auth.AllPermissions),
+	// register udf ECMAScript Function - which returns "42" for now...
+	metaFunction := udf.ScriptUDF{Id: "HHGG", Lang: "js", Body: "42"}
+	ecmaScriptFunction := metaFunction.AsFunction()
+	re := engine.Catalog.FunctionRegistry.Register(ecmaScriptFunction)
+	if re != nil {
+		fmt.Println("Error !!! ")
+		fmt.Println(re)
 	}
-
-	s, err := server.NewDefaultServer(config, engine)
-	if err != nil {
-		panic(err)
+	// now query
+	ctx := sql.NewEmptyContext()
+	_, it, e := engine.Query(ctx, "SELECT HHGG(name) FROM mytable")
+	if e != nil {
+		fmt.Println("Error !!! ")
+		fmt.Println(e)
+		return
 	}
+	rows, _ := sql.RowIterToRows(it)
+	for i := 0; i < len(rows); i++ {
+		fmt.Println(rows[i])
+	}
+	/*
+		config := server.Config{
+			Protocol: "tcp",
+			Address:  "localhost:3306",
+			Auth:     auth.NewNativeSingle("root", "", auth.AllPermissions),
+		}
 
-	s.Start()
+		s, err := server.NewDefaultServer(config, engine)
+		if err != nil {
+			panic(err)
+		}
+
+		_ = s.Start()
+	*/
 }
 
 func createTestDatabase() *memory.Database {

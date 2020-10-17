@@ -16,7 +16,7 @@ const maxAnalysisIterations = 1000
 // ErrMaxAnalysisIters is thrown when the analysis iterations are exceeded
 var ErrMaxAnalysisIters = errors.NewKind("exceeded max analysis iterations (%d)")
 
-// Builder provides an easy way to generate Analyzer with custom rules and options.
+// Builder provides an easy way to generate Analyzer with udf rules and options.
 type Builder struct {
 	preAnalyzeRules     []Rule
 	postAnalyzeRules    []Rule
@@ -28,7 +28,7 @@ type Builder struct {
 }
 
 // NewBuilder creates a new Builder from a specific catalog.
-// This builder allow us add custom Rules and modify some internal properties.
+// This builder allow us add udf Rules and modify some internal properties.
 func NewBuilder(c *sql.Catalog) *Builder {
 	return &Builder{catalog: c}
 }
@@ -145,7 +145,7 @@ type Analyzer struct {
 }
 
 // NewDefault creates a default Analyzer instance with all default Rules and configuration.
-// To add custom rules, the easiest way is use the Builder.
+// To add udf rules, the easiest way is use the Builder.
 func NewDefault(c *sql.Catalog) *Analyzer {
 	return NewBuilder(c).Build()
 }

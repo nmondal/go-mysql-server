@@ -57,7 +57,7 @@ func observeQuery(ctx *sql.Context, query string) func(err error) {
 	}
 }
 
-// New creates a new Engine with custom configuration. To create an Engine with
+// New creates a new Engine with udf configuration. To create an Engine with
 // the default settings use `NewDefault`.
 func New(c *sql.Catalog, a *analyzer.Analyzer, cfg *Config) *Engine {
 	var versionPostfix string

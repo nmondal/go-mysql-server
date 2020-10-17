@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/robertkrimen/otto"
 	"github.com/src-d/go-mysql-server/sql"
+	"regexp"
 	"strings"
 )
 
@@ -30,17 +31,46 @@ func (a *Scriptable) Children() []sql.Expression {
 	return a.args
 }
 
+func CanBeVariableName(s string) (bool, []string) {
+	arr := strings.Split(s, ".")
+	for i := 0; i < len(arr); i++ {
+		r, _ := regexp.MatchString("[a-zA-Z_][a-zA-Z_0-9]*", s)
+		if !r {
+			return r, nil
+		}
+	}
+	return true, arr
+}
+
 func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 	myArgs := make([]interface{}, len(a.args))
+	vm := otto.New()
+	params := make(map[string]map[string]interface{})
 	for i := 0; i < len(a.args); i++ {
 		o, e := a.args[i].Eval(ctx, row)
 		if e != nil {
 			return nil, e
 		}
 		myArgs[i] = o
+		varName := a.args[i].String()
+		isVar, paths := CanBeVariableName(varName)
+		if isVar { // setup the named parameters
+			if val, ok := params[paths[0]]; ok {
+				//do something here
+				val[paths[1]] = o
+			} else {
+				co := make(map[string]interface{})
+				co[paths[1]] = o
+				params[paths[0]] = co
+			}
+		}
+	}
+	// put named parameters back
+	for k, v := range params {
+		_ = vm.Set(k, v)
 	}
 
-	vm := otto.New()
+	// rest of the world
 	_ = vm.Set("$ROW", row)
 	_ = vm.Set("$CONTEXT", ctx)
 	_ = vm.Set("$", myArgs)

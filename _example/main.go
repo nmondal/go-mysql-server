@@ -27,8 +27,8 @@ func main() {
 	engine := sqle.NewDefault()
 	engine.AddDatabase(createTestDatabase())
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
-	// register udf ECMAScript Function - which returns "42" for now...
-	metaFunction := udf.ScriptUDF{Id: "HHGG", Lang: "js", Body: "console.log($[0]); $[0].length"}
+	// register udf ECMAScript Function ....
+	metaFunction := udf.ScriptUDF{Id: "HHGG", Lang: "js", Body: "console.log($[0]); mytable.name.length"}
 	ecmaScriptFunction := metaFunction.AsFunction()
 	re := engine.Catalog.FunctionRegistry.Register(ecmaScriptFunction)
 	if re != nil {

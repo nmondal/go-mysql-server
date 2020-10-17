@@ -31,9 +31,19 @@ func (a *Scriptable) Children() []sql.Expression {
 }
 
 func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row) (interface{}, error) {
+	myArgs := make([]interface{}, len(a.args))
+	for i := 0; i < len(a.args); i++ {
+		o, e := a.args[i].Eval(ctx, row)
+		if e != nil {
+			return nil, e
+		}
+		myArgs[i] = o
+	}
+
 	vm := otto.New()
-	_ = vm.Set("$", row)
-	_ = vm.Set("_$", ctx)
+	_ = vm.Set("$ROW", row)
+	_ = vm.Set("$CONTEXT", ctx)
+	_ = vm.Set("$", myArgs)
 	value, err := vm.Run(a.Meta.Body)
 	return value, err
 }

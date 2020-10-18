@@ -20,7 +20,7 @@ type Scriptable struct {
 }
 
 // This finds the match for where there is an UDF to be created
-var UdfRegex = regexp.MustCompile(`<:([^(<:)^(:>)]+):>`)
+var UdfRegex = regexp.MustCompile(`<\?([^(<\?)^(\?>)]+)\?>`)
 
 // within UDF this does parameter extraction
 var ParamRegex = regexp.MustCompile(`@{([^(@{)^}]+)}`)

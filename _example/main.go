@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	sqle "github.com/src-d/go-mysql-server"
+	"github.com/src-d/go-mysql-server/auth"
+	"github.com/src-d/go-mysql-server/memory"
+	"github.com/src-d/go-mysql-server/server"
+	"github.com/src-d/go-mysql-server/sql"
 	"github.com/src-d/go-mysql-server/sql/expression/function/udf"
 	"time"
-
-	"github.com/src-d/go-mysql-server/memory"
-	"github.com/src-d/go-mysql-server/sql"
 )
 
 // Example of how to implement a MySQL server based on a Engine:
@@ -23,46 +25,47 @@ import (
 // +----------+-------------------+-------------------------------+---------------------+
 // ```
 func main() {
-	q := "SELECT  <: @{mytable.phone_numbers}.length :> FROM mytable"
+	engine := sqle.NewDefault()
+	engine.AddDatabase(createTestDatabase())
+	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
+	// now query
+	ctx := sql.NewEmptyContext()
+	query := "SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable"
+	runAutoUDFEnabledQuery(query, engine, ctx)
+}
+
+func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context) {
+	_, it, e := engine.SQuery(ctx, query)
+	if e != nil {
+		fmt.Println("Error !!! ")
+		fmt.Println(e)
+		return
+	}
+	rows, _ := sql.RowIterToRows(it)
+	for i := 0; i < len(rows); i++ {
+		fmt.Println(rows[i])
+	}
+}
+
+func testAutoUDF() {
+	q := "SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable"
 	pq, udfs := udf.MacroProcessor(q)
 	fmt.Println(pq)
 	fmt.Println(udfs)
+}
 
-	/*
-			engine := sqle.NewDefault()
-			engine.AddDatabase(createTestDatabase())
-			engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
-			// register udf ECMAScript Function ....
-			f1 := udf.ScriptUDF{Id: "f1", Lang: "js", Body: "console.log($[0]); mytable.name.length"}
-			_ = f1.Register(engine)
-			f2 := udf.ScriptUDF{Id: "f2", Lang: "js", Body: "mytable.phone_numbers.length"}
-			_ = f2.Register(engine)
-		    // SELECT  <: @{mytable.phone_numbers}.length :> FROM mytable
-			// now query
-			ctx := sql.NewEmptyContext()
-			_, it, e := engine.Query(ctx, "SELECT f1(name) , f2(phone_numbers) FROM mytable")
-			if e != nil {
-				fmt.Println("Error !!! ")
-				fmt.Println(e)
-				return
-			}
-			rows, _ := sql.RowIterToRows(it)
-			for i := 0; i < len(rows); i++ {
-				fmt.Println(rows[i])
-			}
+func startServer(engine *sqle.Engine) {
+	config := server.Config{
+		Protocol: "tcp",
+		Address:  "localhost:3306",
+		Auth:     auth.NewNativeSingle("root", "", auth.AllPermissions),
+	}
 
-				config := server.Config{
-					Protocol: "tcp",
-					Address:  "localhost:3306",
-					Auth:     auth.NewNativeSingle("root", "", auth.AllPermissions),
-				}
-
-				s, err := server.NewDefaultServer(config, engine)
-				if err != nil {
-					panic(err)
-				}
-				_ = s.Start()
-	*/
+	s, err := server.NewDefaultServer(config, engine)
+	if err != nil {
+		panic(err)
+	}
+	_ = s.Start()
 }
 
 func createTestDatabase() *memory.Database {

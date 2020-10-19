@@ -141,7 +141,11 @@ func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row) (interface{}, erro
 	_ = vm.Set("$CONTEXT", ctx)
 	_ = vm.Set("$", myArgs)
 	value, err := vm.Run(a.Meta.Body)
-	return value, err
+	if err != nil {
+		return nil, err
+	}
+	exportedValue, _ := value.Export()
+	return exportedValue, nil
 }
 
 func (a *Scriptable) String() string {

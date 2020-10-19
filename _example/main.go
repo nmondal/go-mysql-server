@@ -30,7 +30,7 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT <?LST@ @{mytable.name} + '|' + @{mytable.email} ?>  FROM mytable WHERE name LIKE '%Doe%'"
+	query := "SELECT <?LST@ x = { 'n' : @{mytable.name} , 'e': @{mytable.email} }; ?>  FROM mytable WHERE name LIKE '%Doe%'"
 	runAutoUDFEnabledQuery(query, engine, ctx)
 }
 

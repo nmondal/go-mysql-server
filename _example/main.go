@@ -30,7 +30,7 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT fold_s(name) FROM mytable"
+	query := "SELECT <?LST@ @{mytable.name} + '|' + @{mytable.email} ?>  FROM mytable WHERE name LIKE '%Doe%'"
 	runAutoUDFEnabledQuery(query, engine, ctx)
 }
 

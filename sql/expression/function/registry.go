@@ -99,4 +99,10 @@ var Defaults = []sql.Function{
 	sql.Function1{Name: "character_length", Fn: NewCharLength},
 	sql.Function1{Name: "explode", Fn: NewExplode},
 	sql.FunctionN{Name: "regexp_matches", Fn: NewRegexpMatches},
+	// just to test it...
+	sql.FunctionN{Name: "fold_a", Fn: aggregation.NewFoldList},
+	sql.FunctionN{Name: "fold_s", Fn: aggregation.NewFoldSet},
+	sql.FunctionN{Name: "fold_f", Fn: aggregation.NewFoldDouble},
+	sql.FunctionN{Name: "fold_i", Fn: aggregation.NewFoldInt},
+	sql.FunctionN{Name: "fold_str", Fn: aggregation.NewFoldString},
 }

@@ -30,7 +30,7 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable"
+	query := "SELECT fold_s(name) FROM mytable"
 	runAutoUDFEnabledQuery(query, engine, ctx)
 }
 

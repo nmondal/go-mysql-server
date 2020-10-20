@@ -32,6 +32,8 @@ func main() {
 	ctx := sql.NewEmptyContext()
 	query := "SELECT <?LST@ x = { 'n' : @{mytable.name} , 'e': @{mytable.email} }; ?>  FROM mytable WHERE name LIKE '%Doe%'"
 	runAutoUDFEnabledQuery(query, engine, ctx)
+	runAutoUDFEnabledQuery("SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable", engine, ctx)
+	testAutoUDF()
 }
 
 func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context) {
@@ -49,7 +51,7 @@ func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context)
 
 func testAutoUDF() {
 	q := "SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable"
-	pq, udfs := udf.MacroProcessor(q)
+	pq, udfs := udf.MacroProcessor(q, 0)
 	fmt.Println(pq)
 	fmt.Println(udfs)
 }

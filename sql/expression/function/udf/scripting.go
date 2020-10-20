@@ -45,7 +45,7 @@ func AggregatorType(macroStart string) interface{} {
 	return nil
 }
 
-func MacroProcessor(query string) (string, []ScriptUDF) {
+func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 	list := UdfRegex.FindAllStringSubmatch(query, -1)
 	N := len(list)
 	if N == 0 {
@@ -56,7 +56,7 @@ func MacroProcessor(query string) (string, []ScriptUDF) {
 	for i := 0; i < N; i++ {
 		actual := list[i][0]
 		expr := list[i][1]
-		udfName := fmt.Sprintf("_auto_%d_udf_", i+1)
+		udfName := fmt.Sprintf("_auto_%d_udf_", i + 1 + funcNumStart)
 		// check if initialAggregatorValue ?
 		initialAggregatorValue := AggregatorType(actual)
 		if initialAggregatorValue != nil {

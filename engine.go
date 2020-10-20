@@ -25,9 +25,10 @@ type Config struct {
 
 // Engine is a SQL engine.
 type Engine struct {
-	Catalog  *sql.Catalog
-	Analyzer *analyzer.Analyzer
-	Auth     auth.Auth
+	Catalog       *sql.Catalog
+	Analyzer      *analyzer.Analyzer
+	Auth          auth.Auth
+	NumCustomUdfs int
 }
 
 var (
@@ -85,7 +86,7 @@ func New(c *sql.Catalog, a *analyzer.Analyzer, cfg *Config) *Engine {
 		au = cfg.Auth
 	}
 
-	return &Engine{c, a, au}
+	return &Engine{Catalog: c, Analyzer: a, Auth: au}
 }
 
 // NewDefault creates a new default Engine.
@@ -97,6 +98,7 @@ func NewDefault() *Engine {
 }
 
 func (e *Engine) RegisterUDF(scriptUDF udf.ScriptUDF) error {
+	e.NumCustomUdfs++
 	return e.Catalog.FunctionRegistry.Register(scriptUDF.AsFunction())
 }
 
@@ -105,7 +107,7 @@ func (e *Engine) SQuery(
 	ctx *sql.Context,
 	query string,
 ) (sql.Schema, sql.RowIter, error) {
-	processedQuery, customFunctions := udf.MacroProcessor(query)
+	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs)
 	if customFunctions != nil {
 		// now fill up the UDFs...
 		for i := 0; i < len(customFunctions); i++ {

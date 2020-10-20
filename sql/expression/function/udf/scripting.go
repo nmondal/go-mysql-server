@@ -42,7 +42,21 @@ func AggregatorType(macroStart string) interface{} {
 	if strings.HasPrefix(macroStart, "<?INT@") {
 		return 0
 	}
+	if strings.HasPrefix(macroStart, "<?AGG@") {
+		i := strings.Index(macroStart, "#")
+		return macroStart[5 : i+1]
+	}
 	return nil
+}
+
+func isGenericAggregator(value interface{}) bool {
+	switch value.(type) {
+	case string:
+		expression := value.(string)
+		return strings.HasPrefix(expression, "@") && strings.HasSuffix(expression, "#")
+	default:
+		return false
+	}
 }
 
 func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
@@ -56,11 +70,15 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 	for i := 0; i < N; i++ {
 		actual := list[i][0]
 		expr := list[i][1]
-		udfName := fmt.Sprintf("_auto_%d_udf_", i + 1 + funcNumStart)
+		udfName := fmt.Sprintf("_auto_%d_udf_", i+1+funcNumStart)
 		// check if initialAggregatorValue ?
 		initialAggregatorValue := AggregatorType(actual)
 		if initialAggregatorValue != nil {
-			expr = expr[4:]
+			prefixInx := 4
+			if isGenericAggregator(initialAggregatorValue) {
+				prefixInx += len(initialAggregatorValue.(string)) - 1
+			}
+			expr = expr[prefixInx:]
 			udfName = "fold" + udfName
 		}
 
@@ -108,7 +126,7 @@ func CanBeVariableName(s string) (bool, []string) {
 	return true, arr
 }
 
-func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row) (interface{}, error) {
+func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row, partial interface{}) (interface{}, error) {
 	myArgs := make([]interface{}, len(a.args))
 	vm := otto.New()
 	params := make(map[string]map[string]interface{})
@@ -140,6 +158,9 @@ func (a *Scriptable) JSRowEval(ctx *sql.Context, row sql.Row) (interface{}, erro
 	_ = vm.Set("$ROW", row)
 	_ = vm.Set("$CONTEXT", ctx)
 	_ = vm.Set("$", myArgs)
+	if partial != nil {
+		_ = vm.Set("$_", partial)
+	}
 	value, err := vm.Run(a.Meta.Body)
 	if err != nil {
 		return nil, err
@@ -171,7 +192,7 @@ func (a *Scriptable) IsNullable() bool {
 func (a *Scriptable) Eval(ctx *sql.Context, buffer sql.Row) (interface{}, error) {
 	if a.Meta.initial == nil {
 		// this is where we are non aggregated
-		return a.JSRowEval(ctx, buffer)
+		return a.JSRowEval(ctx, buffer, nil)
 	}
 	// now aggregated ....
 	switch a.Meta.initial.(type) {
@@ -196,22 +217,32 @@ func (a *Scriptable) WithChildren(children ...sql.Expression) (sql.Expression, e
 
 // NewBuffer implements AggregationExpression interface. (AggregationExpression)
 func (a *Scriptable) NewBuffer() sql.Row {
+	switch a.Meta.initial.(type) {
+	case string:
+		if isGenericAggregator(a.Meta.initial) {
+			initExpr := a.Meta.initial.(string)
+			initExpr = initExpr[1 : len(initExpr)-1]
+			vm := otto.New()
+			value, err := vm.Run(initExpr)
+			if err != nil {
+				fmt.Printf("Invalid Expression for Aggregate query '%s' \n", initExpr)
+			} else {
+				a.Meta.initial, _ = value.Export()
+			}
+		}
+	default:
+		// do nothing
+	}
 	return sql.NewRow(a.Meta.initial)
 }
 
-func (a *Scriptable) accumulate(ctx *sql.Context, buffer, row sql.Row) error {
-	res, e := a.JSRowEval(ctx, row)
+func (a *Scriptable) accumulate(ctx *sql.Context, buffer sql.Row, row sql.Row) error {
+	res, e := a.JSRowEval(ctx, row, buffer[0])
 	if e != nil {
 		return e
 	}
+	switch a.Meta.initial.(type) {
 
-	switch v := a.Meta.initial.(type) {
-	case int64:
-		buffer[0] = buffer[0].(int64) + res.(int64)
-	case float64:
-		buffer[0] = buffer[0].(float64) + res.(float64)
-	case string:
-		buffer[0] = buffer[0].(string) + res.(string)
 	case []interface{}:
 		arr := buffer[0].([]interface{})
 		arr = append(arr, res)
@@ -221,7 +252,7 @@ func (a *Scriptable) accumulate(ctx *sql.Context, buffer, row sql.Row) error {
 		dataMap[res] = true
 		buffer[0] = dataMap
 	default:
-		fmt.Printf("unexpected type %T \n", v)
+		buffer[0] = res
 	}
 	return nil
 }

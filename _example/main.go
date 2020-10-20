@@ -30,10 +30,10 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT <?LST@ x = { 'n' : @{mytable.name} , 'e': @{mytable.email} }; ?>  FROM mytable WHERE name LIKE '%Doe%'"
+	query := "SELECT <?AGG@ 0 # $_ + 1 ; ?>  FROM mytable"
 	runAutoUDFEnabledQuery(query, engine, ctx)
-	runAutoUDFEnabledQuery("SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable", engine, ctx)
-	testAutoUDF()
+	//runAutoUDFEnabledQuery("SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable", engine, ctx)
+	//testAutoUDF()
 }
 
 func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context) {

@@ -21,7 +21,9 @@ type Scriptable struct {
 }
 
 // This finds the match for where there is an UDF to be created
-var UdfRegex = regexp.MustCompile(`<\?([^(<\?)].+[^(>\?)])+\?>`)
+var UdfRegex = regexp.MustCompile("<\\?([^(<\\?)^(\\?>)]+)\\?>")
+
+// DO NOT EVER CHANGE :: There are test cases (TestMacroProcessor_NormalUDF_2) written on top of it
 
 // within UDF this does parameter extraction
 var ParamRegex = regexp.MustCompile(`@{([^(@{)^}]+)}`)

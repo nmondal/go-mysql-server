@@ -35,15 +35,6 @@ func AggregatorType(macroStart string) interface{} {
 	if strings.HasPrefix(macroStart, "<?SET@") {
 		return make(map[interface{}]bool)
 	}
-	if strings.HasPrefix(macroStart, "<?STR@") {
-		return ""
-	}
-	if strings.HasPrefix(macroStart, "<?DBL@") {
-		return 0.0
-	}
-	if strings.HasPrefix(macroStart, "<?INT@") {
-		return 0
-	}
 	if strings.HasPrefix(macroStart, "<?AGG@") {
 		i := strings.Index(macroStart, "#")
 		return macroStart[5 : i+1]

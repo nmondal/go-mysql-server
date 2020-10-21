@@ -84,3 +84,26 @@ func TestGeneric_UDFS(t *testing.T) {
 	assertions.Equal(nil, e)
 	assertions.Equal(4, len(rows))
 }
+
+func TestGeneric_Agg_Collector(t *testing.T) {
+	assertions := require.New(t)
+	engine := NewDefault()
+	engine.AddDatabase(createTestDatabase())
+	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
+	// now query
+	ctx := sql.NewEmptyContext()
+	query := "SELECT <?LST@ x = { 'n' : @{mytable.name} , 'm' : @{mytable.email} }; ?>  FROM mytable"
+	rows, e := runAutoUDFEnabledQuery(query, engine, ctx)
+	assertions.Equal(nil, e)
+	assertions.Equal(1, len(rows))
+	finalRow := rows[0][0].([]interface{})
+	assertions.Equal(4, len(finalRow))
+
+	// do it SET ?
+	query = "SELECT <?SET@ @{mytable.name} ?>  FROM mytable"
+	rows, e = runAutoUDFEnabledQuery(query, engine, ctx)
+	assertions.Equal(nil, e)
+	assertions.Equal(1, len(rows))
+	finalRow = rows[0][0].([]interface{})
+	assertions.Equal(3, len(finalRow))
+}

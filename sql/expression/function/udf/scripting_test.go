@@ -30,6 +30,11 @@ func TestMacroProcessor_NormalUDFs(t *testing.T) {
 	tq, udfs = MacroProcessor(s, 0)
 	assertions.Equal(0, len(udfs))
 	assertions.Equal(s, tq)
+	// issue found by Sandy
+	s = "SELECT  <? x = @{mytable.phone_numbers}; y = []; y.concat(x); y ?> FROM mytable"
+	tq, udfs = MacroProcessor(s, 0)
+	assertions.Equal(1, len(udfs))
+	assertions.NotEqual(s, tq)
 }
 
 func TestMacroProcessor_Agg_LST_SET(t *testing.T) {

@@ -1,6 +1,7 @@
 package udf
 
 import (
+	"errors"
 	"fmt"
 	exprEval "github.com/antonmedv/expr"
 	"github.com/robertkrimen/otto"
@@ -31,11 +32,6 @@ type Scriptable struct {
 	args []sql.Expression
 }
 
-// This finds the match for where there is an UDF to be created
-var UdfRegex = regexp.MustCompile("<\\?([^(<\\?)^(\\?>)]+)\\?>")
-
-// DO NOT EVER CHANGE :: There are test cases (TestMacroProcessor_NormalUDF_2) written on top of it
-
 // within UDF this does parameter extraction
 var ParamRegex = regexp.MustCompile(`@{([^(@{)^}]+)}`)
 
@@ -53,8 +49,29 @@ func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
 	return nil, Normal
 }
 
+// Extract out macros, failed with regex. TODO Sandy to find out better alternatives
+func FindAllUDFStrings(query string) ([][]string, error) {
+	var myRet = make([][]string, 0)
+	buf := query
+	start := strings.Index(buf, "<?")
+	end := start
+	for start >= 0 {
+		end = strings.Index(buf, "?>")
+		if end < start {
+			return nil, errors.New(fmt.Sprintf("Invalid Macro!!! <?%d : %d?> !!!", start, end))
+		}
+		values := make([]string, 2)
+		values[0] = buf[start : end+2]
+		values[1] = values[0][2 : len(values[0])-2]
+		myRet = append(myRet, values)
+		buf = buf[end+2:]
+		start = strings.Index(buf, "<?")
+	}
+	return myRet, nil
+}
+
 func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
-	list := UdfRegex.FindAllStringSubmatch(query, -1)
+	list, _ := FindAllUDFStrings(query)
 	N := len(list)
 	if N == 0 {
 		return query, nil

@@ -1055,7 +1055,7 @@ func exprToExpression(ctx *sql.Context, e sqlparser.Expr) (sql.Expression, error
 
 func isAggregateFunc(v *sqlparser.FuncExpr) bool {
 	fName := v.Name.Lowered()
-	if strings.HasPrefix(fName, "fold_") {
+	if strings.HasPrefix(fName, "fold_") || strings.HasPrefix(fName, "pvt_fold_") {
 		return true
 	}
 	switch fName {

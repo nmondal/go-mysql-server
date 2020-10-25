@@ -72,6 +72,18 @@ func TestMacroProcessor_Agg_Generic(t *testing.T) {
 	assertions.Equal(TypeOfUDF(GenericAggregator), udfs[0].udfType)
 }
 
+func TestMacroProcessor_Agg_Pivot_Generic(t *testing.T) {
+	assertions := require.New(t)
+	// list
+	s := "SELECT  <?PVT@ [] # l = @{mytable.phone_numbers}.length; $_ = $_.concat() ?> FROM mytable;"
+	tq, udfs := MacroProcessor(s, 0)
+	assertions.Equal(1, len(udfs))
+	assertions.NotEqual(s, tq)
+	assertions.NotEmpty(udfs[0].initial.(string))
+	assertions.Equal(TypeOfUDF(GenericPivotAggregator), udfs[0].udfType)
+
+}
+
 func TestScripting_JS_Expressions_No_Params(t *testing.T) {
 	assertions := require.New(t)
 	udf := &ScriptUDF{Id: "dummy", Lang: "js", Body: "42", initial: nil}

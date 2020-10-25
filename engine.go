@@ -1,7 +1,9 @@
 package sqle
 
 import (
+	"errors"
 	"github.com/src-d/go-mysql-server/sql/expression/function/udf"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/metrics/discard"
@@ -110,6 +112,15 @@ func (e *Engine) SQuery(
 	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs)
 	if customFunctions != nil {
 		// now fill up the UDFs...
+		pvtCount := 0
+		for i := 0; i < len(customFunctions); i++ {
+			if strings.HasPrefix(customFunctions[i].Id, "pvt_fold_") {
+				pvtCount++;
+			}
+		}
+		if pvtCount > 1 {
+			return nil, nil, errors.New("Cannot have more than one pivot agg udf.")
+		}
 		for i := 0; i < len(customFunctions); i++ {
 			_ = e.RegisterUDF(customFunctions[i])
 		}

@@ -13,10 +13,11 @@ import (
 type TypeOfUDF int
 
 const (
-	Normal            = 0
-	ListAggregator    = 1
-	SetAggregator     = 2
-	GenericAggregator = 3
+	Normal                 = 0
+	ListAggregator         = 1
+	SetAggregator          = 2
+	GenericAggregator      = 3
+	GenericPivotAggregator = 4
 )
 
 type ScriptUDF struct {
@@ -45,6 +46,10 @@ func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
 	if strings.HasPrefix(macroStart, "<?AGG@") {
 		i := strings.Index(macroStart, "#")
 		return macroStart[5 : i+1], GenericAggregator
+	}
+	if strings.HasPrefix(macroStart, "<?PVT@") {
+		i := strings.Index(macroStart, "#")
+		return macroStart[5 : i+1], GenericPivotAggregator
 	}
 	return nil, Normal
 }
@@ -86,11 +91,14 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 		initialAggregatorValue, udfType := AggregatorType(actual)
 		if initialAggregatorValue != nil {
 			prefixInx := 4
-			if udfType == GenericAggregator {
+			if udfType == GenericAggregator || udfType == GenericPivotAggregator{
 				prefixInx += len(initialAggregatorValue.(string)) - 1
 			}
 			expr = expr[prefixInx:]
 			udfName = "fold" + udfName
+			if udfType == GenericPivotAggregator {
+				udfName = "pvt_" + udfName
+			}
 		}
 
 		myParams := ParamRegex.FindAllStringSubmatch(expr, -1)
@@ -283,7 +291,7 @@ func (a *Scriptable) __initExpr(initExpr string) (interface{}, error) {
 
 // NewBuffer implements AggregationExpression interface. (AggregationExpression)
 func (a *Scriptable) NewBuffer() sql.Row {
-	if a.Meta.udfType == TypeOfUDF(GenericAggregator) {
+	if a.Meta.udfType == TypeOfUDF(GenericAggregator) || a.Meta.udfType == TypeOfUDF(GenericPivotAggregator) {
 		initExpr := a.Meta.initial.(string)
 		initExpr = initExpr[1 : len(initExpr)-1]
 		value, err := a.__initExpr(initExpr)

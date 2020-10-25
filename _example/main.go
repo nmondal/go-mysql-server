@@ -30,7 +30,10 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT <?AGG@ [ 0, 1 ] # $_[0] += 1 ; $_[1] *= $_[0] ; $_ ; ?>  FROM mytable"
+	query := "SELECT * FROM mytable WHERE JSON_EXTRACT('0', '$') IN (SELECT <?PVT@ [] # $_ = $_.concat([0]); $_ ; ?> FROM mytable)"
+	//query := "SELECT * FROM mytable WHERE 0 IN (SELECT 0 FROM mytable)"
+	//query := "SELECT 1 FROM mytable"
+	//query := "SELECT JSON_EXTRACT(<?PVT@ [] # $_ = $_.concat(['car']); $_ ; ?>, '$') FROM mytable"
 	runAutoUDFEnabledQuery(query, engine, ctx)
 	//runAutoUDFEnabledQuery("SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable", engine, ctx)
 	//testAutoUDF()

@@ -2,8 +2,10 @@ package plan
 
 import (
 	"fmt"
+	"github.com/src-d/go-mysql-server/sql/expression/function/udf"
 	"hash/crc64"
 	"io"
+	"reflect"
 	"strings"
 
 	opentracing "github.com/opentracing/opentracing-go"
@@ -152,12 +154,18 @@ func (p *GroupBy) Expressions() []sql.Expression {
 	return exprs
 }
 
+type expandedRows struct {
+	rows       []sql.Row
+	currentInd int
+}
+
 type groupByIter struct {
 	aggregate []sql.Expression
 	child     sql.RowIter
 	ctx       *sql.Context
 	buf       []sql.Row
 	done      bool
+	eRows     expandedRows
 }
 
 func newGroupByIter(ctx *sql.Context, aggregate []sql.Expression, child sql.RowIter) *groupByIter {
@@ -174,27 +182,71 @@ func (i *groupByIter) Next() (sql.Row, error) {
 		return nil, io.EOF
 	}
 
-	i.done = true
+	if len(i.eRows.rows) == 0 {
+		for j, a := range i.aggregate {
+			i.buf[j] = fillBuffer(a)
+		}
 
-	for j, a := range i.aggregate {
-		i.buf[j] = fillBuffer(a)
+		for {
+			row, err := i.child.Next()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				i.done = true
+				return nil, err
+			}
+
+			if err := updateBuffers(i.ctx, i.buf, i.aggregate, row); err != nil {
+				i.done = true
+				return nil, err
+			}
+		}
+		row, err := evalBuffers(i.ctx, i.buf, i.aggregate)
+		if err != nil {
+			i.done = true
+			return row, err
+		}
+		i.eRows.rows = expandRow(row, i.aggregate)
 	}
 
-	for {
-		row, err := i.child.Next()
-		if err != nil {
-			if err == io.EOF {
+	row := i.eRows.rows[i.eRows.currentInd]
+	i.eRows.currentInd++
+	if i.eRows.currentInd >= len(i.eRows.rows) {
+		i.done = true
+	}
+	return row, nil;
+}
+
+func expandRow(row sql.Row, aggregate []sql.Expression) []sql.Row {
+	pvtIndex := -1
+	for i, agg := range aggregate {
+		switch agg.(type) {
+		case *udf.Scriptable:
+			if strings.HasPrefix(agg.(*udf.Scriptable).Meta.Id, "pvt_fold_") {
+				pvtIndex = i
 				break
 			}
-			return nil, err
-		}
-
-		if err := updateBuffers(i.ctx, i.buf, i.aggregate, row); err != nil {
-			return nil, err
 		}
 	}
-
-	return evalBuffers(i.ctx, i.buf, i.aggregate)
+	var rows []sql.Row
+	if pvtIndex == -1 {
+		rows = []sql.Row { row }
+	} else {
+		col := row[pvtIndex]
+		switch val := reflect.ValueOf(col); val.Type().Kind() {
+		case reflect.Slice:
+			for i := 0; i < val.Len(); i++ {
+				v := val.Index(i)
+				r := sql.Row.Copy(row)
+				r[pvtIndex] = v.Interface()
+				rows = append(rows, r)
+			}
+		default:
+			rows = []sql.Row{ row }
+		}
+	}
+	return rows
 }
 
 func (i *groupByIter) Close() error {

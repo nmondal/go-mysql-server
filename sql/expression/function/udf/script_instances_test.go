@@ -68,3 +68,17 @@ func TestScripting_EXPR_Expressions_With_Params(t *testing.T) {
 	res, _ = si.ScriptEval(map[string]interface{}{"x": -1, "y": 1})
 	assertions.Equal(0, res)
 }
+
+func TestScripting_V8_EVAL_Expressions_No_Params(t *testing.T) {
+	assertions := require.New(t)
+	si := GetScriptInstance("v8", "42")
+	res, _ := si.EvalFromString("42")
+	assertions.Equal(int64(42), res)
+}
+
+func TestScripting_V8_Expressions_With_Params(t *testing.T) {
+	assertions := require.New(t)
+	si := GetScriptInstance("v8", "x + y ;")
+	res, _ := si.ScriptEval(map[string]interface{}{"x": 32, "y": 10})
+	assertions.True(42 == res.(int64))
+}

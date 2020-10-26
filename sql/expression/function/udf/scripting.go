@@ -10,15 +10,21 @@ import (
 	"strings"
 )
 
-type TypeOfUDF int
+type AggregatorTypeOfUDF int
 
 const (
-	Normal                 = 0
-	ListAggregator         = 1
-	SetAggregator          = 2
-	GenericAggregator      = 3
-	GenericPivotAggregator = 4
+	NotAnAggregator   AggregatorTypeOfUDF = 0
+	ListAggregator    AggregatorTypeOfUDF = 1
+	SetAggregator     AggregatorTypeOfUDF = 2
+	GenericAggregator AggregatorTypeOfUDF = 3
 )
+
+type TypeOfUDF struct {
+	IsAggregator   bool
+	AggregatorType AggregatorTypeOfUDF
+	Flatten        bool
+	Transpose      bool
+}
 
 type ScriptUDF struct {
 	Id      string
@@ -33,25 +39,57 @@ type Scriptable struct {
 	args []sql.Expression
 }
 
+var AggregatorRegex = regexp.MustCompile(`^<\?[A-Z_]{3}@.+`)
+
 // within UDF this does parameter extraction
 var ParamRegex = regexp.MustCompile(`@{([^(@{)^}]+)}`)
 
+/**
+Let's define the protocol : Here
+L__ -> List, no flatten, no transpose
+L_T -> List, no flatten, Transpose
+LFT -> List, Flatten, Transpose
+
+S__ -> Set, no flatten, no transpose
+S_T -> Set, no flatten, Transpose
+SFT -> Set, Flatten, Transpose
+
+--> AGG can not have flatten it is upto author
+AGG -> Aggregate, no flatten, no transpose
+AGT -> AGG, no flatten, Transpose
+*/
 func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
-	if strings.HasPrefix(macroStart, "<?LST@") {
-		return make([]interface{}, 0), ListAggregator
+	typeOfUDF := TypeOfUDF{IsAggregator: false, AggregatorType: NotAnAggregator, Flatten: false, Transpose: false}
+	if !AggregatorRegex.MatchString(macroStart) {
+		return nil, typeOfUDF
 	}
-	if strings.HasPrefix(macroStart, "<?SET@") {
-		return make(map[interface{}]bool), SetAggregator
+
+	identifier := macroStart[2:5]
+
+	if identifier[1] == 'F' {
+		typeOfUDF.Flatten = true
 	}
-	if strings.HasPrefix(macroStart, "<?AGG@") {
+
+	if identifier[2] == 'T' {
+		typeOfUDF.Transpose = true
+	}
+
+	switch identifier[0] {
+	case 'L':
+		typeOfUDF.AggregatorType = ListAggregator
+		return make([]interface{}, 0), typeOfUDF
+	case 'S':
+		typeOfUDF.AggregatorType = SetAggregator
+		return make(map[interface{}]bool), typeOfUDF
+	case 'A':
+		typeOfUDF.AggregatorType = GenericAggregator
 		i := strings.Index(macroStart, "#")
-		return macroStart[5 : i+1], GenericAggregator
+		return macroStart[5 : i+1], typeOfUDF
+	default:
+		typeOfUDF.AggregatorType = NotAnAggregator
+		// should not come here
 	}
-	if strings.HasPrefix(macroStart, "<?PVT@") {
-		i := strings.Index(macroStart, "#")
-		return macroStart[5 : i+1], GenericPivotAggregator
-	}
-	return nil, Normal
+	return nil, typeOfUDF
 }
 
 // Extract out macros, failed with regex. TODO Sandy to find out better alternatives
@@ -91,12 +129,12 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 		initialAggregatorValue, udfType := AggregatorType(actual)
 		if initialAggregatorValue != nil {
 			prefixInx := 4
-			if udfType == GenericAggregator || udfType == GenericPivotAggregator{
+			if udfType.IsAggregator {
 				prefixInx += len(initialAggregatorValue.(string)) - 1
 			}
 			expr = expr[prefixInx:]
 			udfName = "fold" + udfName
-			if udfType == GenericPivotAggregator {
+			if udfType.Transpose {
 				udfName = "pvt_" + udfName
 			}
 		}
@@ -255,7 +293,7 @@ func (a *Scriptable) Eval(ctx *sql.Context, buffer sql.Row) (interface{}, error)
 		return a.EvalScript(ctx, buffer, nil)
 	}
 	// now aggregated ....
-	if a.Meta.udfType == TypeOfUDF(SetAggregator) {
+	if a.Meta.udfType.AggregatorType == SetAggregator {
 		dataMap := buffer[0].(map[interface{}]bool)
 		retList := make([]interface{}, len(dataMap))
 		k := 0
@@ -291,7 +329,7 @@ func (a *Scriptable) __initExpr(initExpr string) (interface{}, error) {
 
 // NewBuffer implements AggregationExpression interface. (AggregationExpression)
 func (a *Scriptable) NewBuffer() sql.Row {
-	if a.Meta.udfType == TypeOfUDF(GenericAggregator) || a.Meta.udfType == TypeOfUDF(GenericPivotAggregator) {
+	if a.Meta.udfType.AggregatorType == GenericAggregator {
 		initExpr := a.Meta.initial.(string)
 		initExpr = initExpr[1 : len(initExpr)-1]
 		value, err := a.__initExpr(initExpr)
@@ -309,7 +347,7 @@ func (a *Scriptable) accumulate(ctx *sql.Context, buffer sql.Row, row sql.Row) e
 	if e != nil {
 		return e
 	}
-	switch a.Meta.udfType {
+	switch a.Meta.udfType.AggregatorType {
 	case ListAggregator:
 		arr := buffer[0].([]interface{})
 		arr = append(arr, res)

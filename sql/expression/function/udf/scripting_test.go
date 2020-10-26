@@ -14,7 +14,7 @@ func TestMacroProcessor_NormalUDFs(t *testing.T) {
 	tq, udfs := MacroProcessor(s, 0)
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
-	assertions.Equal(TypeOfUDF(Normal), udfs[0].udfType)
+	assertions.False(udfs[0].udfType.IsAggregator)
 	// 2 match
 	s = "SELECT  <? @{mytable.phone_numbers}.length ?> ,  <? @{mytable.address}.firstLine ?> FROM mytable;"
 	tq, udfs = MacroProcessor(s, 0)
@@ -44,21 +44,21 @@ func TestMacroProcessor_Agg_LST_SET(t *testing.T) {
 	st := reflect.TypeOf(make(map[interface{}]bool))
 	assertions := require.New(t)
 	// list
-	s := "SELECT  <?LST@ @{mytable.phone_numbers}.length ?> FROM mytable;"
+	s := "SELECT  <?L__@ @{mytable.phone_numbers}.length ?> FROM mytable;"
 	tq, udfs := MacroProcessor(s, 0)
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
 	assertions.Equal(lt, reflect.TypeOf(udfs[0].initial))
 	assertions.Equal(0, len(udfs[0].initial.([]interface{})))
-	assertions.Equal(TypeOfUDF(ListAggregator), udfs[0].udfType)
+	assertions.Equal(ListAggregator, udfs[0].udfType.AggregatorType)
 	// set
-	s = "SELECT  <?SET@ @{mytable.phone_numbers}.length ?> FROM mytable;"
+	s = "SELECT  <?S__@ @{mytable.phone_numbers}.length ?> FROM mytable;"
 	tq, udfs = MacroProcessor(s, 0)
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
 	assertions.Equal(st, reflect.TypeOf(udfs[0].initial))
 	assertions.Equal(0, len(udfs[0].initial.(map[interface{}]bool)))
-	assertions.Equal(TypeOfUDF(SetAggregator), udfs[0].udfType)
+	assertions.Equal(SetAggregator, udfs[0].udfType.AggregatorType)
 }
 
 func TestMacroProcessor_Agg_Generic(t *testing.T) {
@@ -69,18 +69,19 @@ func TestMacroProcessor_Agg_Generic(t *testing.T) {
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
 	assertions.NotEmpty(udfs[0].initial.(string))
-	assertions.Equal(TypeOfUDF(GenericAggregator), udfs[0].udfType)
+	assertions.Equal(GenericAggregator, udfs[0].udfType.AggregatorType)
 }
 
 func TestMacroProcessor_Agg_Pivot_Generic(t *testing.T) {
 	assertions := require.New(t)
 	// list
-	s := "SELECT  <?PVT@ [] # l = @{mytable.phone_numbers}.length; $_ = $_.concat() ?> FROM mytable;"
+	s := "SELECT  <?AGT@ [] # l = @{mytable.phone_numbers}.length; $_ = $_.concat() ?> FROM mytable;"
 	tq, udfs := MacroProcessor(s, 0)
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
 	assertions.NotEmpty(udfs[0].initial.(string))
-	assertions.Equal(TypeOfUDF(GenericPivotAggregator), udfs[0].udfType)
+	assertions.Equal(GenericAggregator, udfs[0].udfType.AggregatorType)
+	assertions.True(udfs[0].udfType.Transpose)
 
 }
 

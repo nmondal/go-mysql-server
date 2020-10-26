@@ -93,9 +93,9 @@ func TestScripting_JS_Expressions_No_Params(t *testing.T) {
 	// this is for int
 	assertions.True(42 == res.(int64))
 	// now double
-	s.Meta.Body = "42.0"
+	s.Meta.Body = "42.23"
 	res, _ = s.EvalScript(nil, nil, nil)
-	assertions.True(42.0 == res.(float64))
+	assertions.True(42.23 == res.(float64))
 	// now string
 	s.Meta.Body = "x='42';"
 	res, _ = s.EvalScript(nil, nil, nil)
@@ -103,7 +103,7 @@ func TestScripting_JS_Expressions_No_Params(t *testing.T) {
 	// list of primitives
 	s.Meta.Body = " x =[ 42, 42, 42 ] ;"
 	res, _ = s.EvalScript(nil, nil, nil)
-	assertions.Equal(3, len(res.([]int64)))
+	assertions.Equal(3, len(res.([]interface{})))
 	// a map ?
 	s.Meta.Body = " x = { 'i' : 42 }  ;"
 	res, _ = s.EvalScript(nil, nil, nil)

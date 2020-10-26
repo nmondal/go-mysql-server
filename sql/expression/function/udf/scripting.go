@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	exprEval "github.com/antonmedv/expr"
-	"github.com/robertkrimen/otto"
+	"github.com/dop251/goja"
 	"github.com/src-d/go-mysql-server/sql"
 	"regexp"
 	"strings"
@@ -63,7 +63,7 @@ func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
 	if !AggregatorRegex.MatchString(macroStart) {
 		return nil, typeOfUDF
 	}
-
+	typeOfUDF.IsAggregator = true
 	identifier := macroStart[2:5]
 
 	if identifier[1] == 'F' {
@@ -86,6 +86,7 @@ func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
 		i := strings.Index(macroStart, "#")
 		return macroStart[5 : i+1], typeOfUDF
 	default:
+		typeOfUDF.IsAggregator = false
 		typeOfUDF.AggregatorType = NotAnAggregator
 		// should not come here
 	}
@@ -129,7 +130,7 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 		initialAggregatorValue, udfType := AggregatorType(actual)
 		if initialAggregatorValue != nil {
 			prefixInx := 4
-			if udfType.IsAggregator {
+			if udfType.AggregatorType == GenericAggregator {
 				prefixInx += len(initialAggregatorValue.(string)) - 1
 			}
 			expr = expr[prefixInx:]
@@ -222,24 +223,23 @@ func (a *Scriptable) __js(ctx *sql.Context, row sql.Row, partial interface{}) (i
 	if e != nil {
 		return nil, e
 	}
-	vm := otto.New()
+	vm := goja.New()
 	// put named parameters back
 	for k, v := range params {
-		_ = vm.Set(k, v)
+		vm.Set(k, v)
 	}
 	// rest of the world
-	_ = vm.Set("$ROW", row)
-	_ = vm.Set("$CONTEXT", ctx)
-	_ = vm.Set("$", myArgs)
+	vm.Set("$ROW", row)
+	vm.Set("$CONTEXT", ctx)
+	vm.Set("$", myArgs)
 	if partial != nil {
-		_ = vm.Set("$_", partial)
+		vm.Set("$_", partial)
 	}
-	value, err := vm.Run(a.Meta.Body)
+	value, err := vm.RunString(a.Meta.Body)
 	if err != nil {
 		return nil, err
 	}
-	exportedValue, _ := value.Export()
-	return exportedValue, nil
+	return value.Export(), nil
 }
 
 func (a *Scriptable) __expr(ctx *sql.Context, row sql.Row, partial interface{}) (interface{}, error) {
@@ -317,13 +317,12 @@ func (a *Scriptable) __initExpr(initExpr string) (interface{}, error) {
 	case "expr":
 		return exprEval.Eval(initExpr, map[string]interface{}{})
 	default:
-		jsVM := otto.New()
-		value, e := jsVM.Run(initExpr)
+		jsVM := goja.New()
+		value, e := jsVM.RunString(initExpr)
 		if e != nil {
 			return nil, e
 		}
-		v, _ := value.Export()
-		return v, nil
+		return value.Export(), nil
 	}
 }
 

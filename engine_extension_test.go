@@ -107,3 +107,22 @@ func TestGeneric_Agg_Collector(t *testing.T) {
 	finalRow = rows[0][0].([]interface{})
 	assertions.Equal(3, len(finalRow))
 }
+
+func TestGeneric_Agg_Collector_Transpose(t *testing.T) {
+	assertions := require.New(t)
+	engine := NewDefault()
+	engine.AddDatabase(createTestDatabase())
+	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
+	// now query
+	ctx := sql.NewEmptyContext()
+	query := "SELECT <?L_T@ x = { 'n' : @{mytable.name} , 'm' : @{mytable.email} }; ?>  FROM mytable"
+	rows, e := runAutoUDFEnabledQuery(query, engine, ctx)
+	assertions.Equal(nil, e)
+	assertions.Equal(4, len(rows))
+
+	// do it SET ?
+	query = "SELECT <?S_T@ @{mytable.name} ?>  FROM mytable"
+	rows, e = runAutoUDFEnabledQuery(query, engine, ctx)
+	assertions.Equal(nil, e)
+	assertions.Equal(3, len(rows))
+}

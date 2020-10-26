@@ -61,7 +61,7 @@ func (uc *UnresolvedColumn) String() string {
 
 // Eval implements the Expression interface.
 func (*UnresolvedColumn) Eval(ctx *sql.Context, r sql.Row) (interface{}, error) {
-	panic("unresolved column is a placeholder node, but ScriptEval was called")
+	panic("unresolved column is a placeholder node, but Eval was called")
 }
 
 // WithChildren implements the Expression interface.
@@ -125,7 +125,7 @@ func (uf *UnresolvedFunction) String() string {
 
 // Eval implements the Expression interface.
 func (*UnresolvedFunction) Eval(ctx *sql.Context, r sql.Row) (interface{}, error) {
-	panic("unresolved function is a placeholder node, but ScriptEval was called")
+	panic("unresolved function is a placeholder node, but Eval was called")
 }
 
 // WithChildren implements the Expression interface.

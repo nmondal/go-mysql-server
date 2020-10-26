@@ -12,7 +12,7 @@ import (
 var ErrUintOverflow = errors.NewKind(
 	"Unsigned integer too big to fit on signed integer")
 
-// compEval is used to implement Greatest/Least ScriptEval() using a comparison function
+// compEval is used to implement Greatest/Least Eval() using a comparison function
 func compEval(
 	returnType sql.Type,
 	args []sql.Expression,

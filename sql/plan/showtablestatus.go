@@ -21,7 +21,7 @@ func NewShowTableStatus(dbs ...string) *ShowTableStatus {
 
 var showTableStatusSchema = sql.Schema{
 	{Name: "Name", Type: sql.Text},
-	{Name: "Script", Type: sql.Text},
+	{Name: "Engine", Type: sql.Text},
 	{Name: "Version", Type: sql.Text},
 	{Name: "Row_format", Type: sql.Text},
 	{Name: "Rows", Type: sql.Int64},
@@ -107,7 +107,7 @@ func stringContains(slice []string, str string) bool {
 func tableToStatusRow(table string) sql.Row {
 	return sql.NewRow(
 		table,    // Name
-		"InnoDB", // Script
+		"InnoDB", // Engine
 		// This column is unused. With the removal of .frm files in MySQL 8.0, this
 		// column now reports a hardcoded value of 10, which is the last .frm file
 		// version used in MySQL 5.7.

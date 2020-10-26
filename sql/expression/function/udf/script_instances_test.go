@@ -73,15 +73,15 @@ func TestScripting_V8_EVAL_Expressions_No_Params(t *testing.T) {
 	assertions := require.New(t)
 	si := GetScriptInstance("v8", "42")
 	res, _ := si.EvalFromString("42")
-	assertions.Equal(int64(42), res)
+	assertions.Equal(float64(42), res)
 	// test JS V8 mapping function ...
 	res, _ = si.EvalFromString("[1,2,3,4].reduce((sum, x) => sum + x);")
-	assertions.Equal(int64(10), res)
+	assertions.Equal(float64(10), res)
 }
 
 func TestScripting_V8_Expressions_With_Params(t *testing.T) {
 	assertions := require.New(t)
 	si := GetScriptInstance("v8", "x + y ;")
 	res, _ := si.ScriptEval(map[string]interface{}{"x": 32, "y": 10})
-	assertions.True(42 == res.(int64))
+	assertions.True(42 == res.(float64))
 }

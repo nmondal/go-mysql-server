@@ -30,7 +30,7 @@ func (i *Interval) IsNullable() bool { return i.Child.IsNullable() }
 
 // Eval implements the sql.Expression interface.
 func (i *Interval) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
-	panic("Interval.Eval is just a placeholder method and should not be called directly")
+	panic("Interval.ScriptEval is just a placeholder method and should not be called directly")
 }
 
 var (

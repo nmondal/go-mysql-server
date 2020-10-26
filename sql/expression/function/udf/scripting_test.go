@@ -84,38 +84,3 @@ func TestMacroProcessor_Agg_Pivot_Generic(t *testing.T) {
 	assertions.True(udfs[0].udfType.Transpose)
 
 }
-
-func TestScripting_JS_Expressions_No_Params(t *testing.T) {
-	assertions := require.New(t)
-	udf := &ScriptUDF{Id: "dummy", Lang: "js", Body: "42", initial: nil}
-	s := Scriptable{Meta: udf, args: nil}
-	res, _ := s.EvalScript(nil, nil, nil)
-	// this is for int
-	assertions.True(42 == res.(int64))
-	// now double
-	s.Meta.Body = "42.23"
-	res, _ = s.EvalScript(nil, nil, nil)
-	assertions.True(42.23 == res.(float64))
-	// now string
-	s.Meta.Body = "x='42';"
-	res, _ = s.EvalScript(nil, nil, nil)
-	assertions.True("42" == res.(string))
-	// list of primitives
-	s.Meta.Body = " x =[ 42, 42, 42 ] ;"
-	res, _ = s.EvalScript(nil, nil, nil)
-	assertions.Equal(3, len(res.([]interface{})))
-	// a map ?
-	s.Meta.Body = " x = { 'i' : 42 }  ;"
-	res, _ = s.EvalScript(nil, nil, nil)
-	assertions.Equal(1, len(res.(map[string]interface{})))
-
-}
-
-func TestScripting_EXPR_EVAL_Expressions_No_Params(t *testing.T) {
-	assertions := require.New(t)
-	udf := &ScriptUDF{Id: "dummy", Lang: "expr", Body: "42", initial: nil}
-	s := Scriptable{Meta: udf, args: nil}
-	res, _ := s.EvalScript(nil, nil, nil)
-	// this is for int
-	assertions.True(42 == res)
-}

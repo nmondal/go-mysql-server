@@ -83,7 +83,7 @@ type Expression interface {
 // aggregation buffer is created for each grouping (NewBuffer) and rows in the
 // grouping are fed to the buffer (Update). Multiple buffers can be merged
 // (Merge), making partial aggregations possible.
-// Note that Eval must be called with the final aggregation buffer in order to
+// Note that ScriptEval must be called with the final aggregation buffer in order to
 // get the final result.
 type Aggregation interface {
 	Expression

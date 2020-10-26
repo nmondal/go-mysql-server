@@ -74,6 +74,9 @@ func TestScripting_V8_EVAL_Expressions_No_Params(t *testing.T) {
 	si := GetScriptInstance("v8", "42")
 	res, _ := si.EvalFromString("42")
 	assertions.Equal(int64(42), res)
+	// test JS V8 mapping function ...
+	res, _ = si.EvalFromString("[1,2,3,4].reduce((sum, x) => sum + x);")
+	assertions.Equal(int64(10), res)
 }
 
 func TestScripting_V8_Expressions_With_Params(t *testing.T) {

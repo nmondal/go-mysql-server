@@ -37,7 +37,7 @@ func main() {
 }
 
 func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context) {
-	_, it, e := engine.SQuery(ctx, query)
+	_, it, e := engine.SQuery(ctx, query, "js")
 	if e != nil {
 		fmt.Println("Error !!! ")
 		fmt.Println(e)
@@ -51,7 +51,7 @@ func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context)
 
 func testAutoUDF() {
 	q := "SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable"
-	pq, udfs := udf.MacroProcessor(q, 0)
+	pq, udfs := udf.MacroProcessor(q, 0, "js")
 	fmt.Println(pq)
 	fmt.Println(udfs)
 }

@@ -219,27 +219,27 @@ func (i *groupByIter) Next() (sql.Row, error) {
 }
 
 func expandRow(row sql.Row, aggregate []sql.Expression) []sql.Row {
-	pvtIndex := -1
+	transposeColInd := -1
 	for i, agg := range aggregate {
 		switch agg.(type) {
 		case *udf.Scriptable:
-			if strings.HasPrefix(agg.(*udf.Scriptable).Meta.Id, "pvt_fold_") {
-				pvtIndex = i
+			if agg.(*udf.Scriptable).Meta.UdfType.Transpose {
+				transposeColInd = i
 				break
 			}
 		}
 	}
 	var rows []sql.Row
-	if pvtIndex == -1 {
+	if transposeColInd == -1 {
 		rows = []sql.Row { row }
 	} else {
-		col := row[pvtIndex]
+		col := row[transposeColInd]
 		switch val := reflect.ValueOf(col); val.Type().Kind() {
 		case reflect.Slice:
 			for i := 0; i < val.Len(); i++ {
 				v := val.Index(i)
 				r := sql.Row.Copy(row)
-				r[pvtIndex] = v.Interface()
+				r[transposeColInd] = v.Interface()
 				rows = append(rows, r)
 			}
 		default:

@@ -30,10 +30,7 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT * FROM mytable WHERE JSON_EXTRACT('0', '$') IN (SELECT <?PVT@ [] # $_ = $_.concat([0]); $_ ; ?> FROM mytable)"
-	//query := "SELECT * FROM mytable WHERE 0 IN (SELECT 0 FROM mytable)"
-	//query := "SELECT 1 FROM mytable"
-	//query := "SELECT JSON_EXTRACT(<?PVT@ [] # $_ = $_.concat(['car']); $_ ; ?>, '$') FROM mytable"
+	query := "SELECT <?SFT@ @{mytable.phone_numbers} ?> FROM mytable"
 	runAutoUDFEnabledQuery(query, engine, ctx)
 	//runAutoUDFEnabledQuery("SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable", engine, ctx)
 	//testAutoUDF()
@@ -89,9 +86,10 @@ func createTestDatabase() *memory.Database {
 
 	db.AddTable(tableName, table)
 	ctx := sql.NewEmptyContext()
-	table.Insert(ctx, sql.NewRow("John Doe", "john@doe.com", []string{"555-555-555"}, time.Now()))
+	table.Insert(ctx, sql.NewRow("John Doe", "john@doe.com", []string{"555-555-555", "040-2406-7468"}, time.Now()))
 	table.Insert(ctx, sql.NewRow("John Doe", "johnalt@doe.com", []string{}, time.Now()))
 	table.Insert(ctx, sql.NewRow("Jane Doe", "jane@doe.com", []string{}, time.Now()))
-	table.Insert(ctx, sql.NewRow("Evil Bob", "evilbob@gmail.com", []string{"555-666-555", "666-666-666"}, time.Now()))
+	table.Insert(ctx, sql.NewRow("Evil Bob", "evilbob@gmail.com", []string{"555-555-555", "666-666-666",
+		"444-555", "123-456"}, time.Now()))
 	return db
 }

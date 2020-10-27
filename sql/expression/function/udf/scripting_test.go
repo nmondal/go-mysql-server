@@ -14,7 +14,7 @@ func TestMacroProcessor_NormalUDFs(t *testing.T) {
 	tq, udfs := MacroProcessor(s, 0)
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
-	assertions.False(udfs[0].udfType.IsAggregator)
+	assertions.False(udfs[0].UdfType.IsAggregator)
 	// 2 match
 	s = "SELECT  <? @{mytable.phone_numbers}.length ?> ,  <? @{mytable.address}.firstLine ?> FROM mytable;"
 	tq, udfs = MacroProcessor(s, 0)
@@ -50,7 +50,7 @@ func TestMacroProcessor_Agg_LST_SET(t *testing.T) {
 	assertions.NotEqual(s, tq)
 	assertions.Equal(lt, reflect.TypeOf(udfs[0].initial))
 	assertions.Equal(0, len(udfs[0].initial.([]interface{})))
-	assertions.Equal(ListAggregator, udfs[0].udfType.AggregatorType)
+	assertions.Equal(ListAggregator, udfs[0].UdfType.AggregatorType)
 	// set
 	s = "SELECT  <?S__@ @{mytable.phone_numbers}.length ?> FROM mytable;"
 	tq, udfs = MacroProcessor(s, 0)
@@ -58,7 +58,7 @@ func TestMacroProcessor_Agg_LST_SET(t *testing.T) {
 	assertions.NotEqual(s, tq)
 	assertions.Equal(st, reflect.TypeOf(udfs[0].initial))
 	assertions.Equal(0, len(udfs[0].initial.(map[interface{}]bool)))
-	assertions.Equal(SetAggregator, udfs[0].udfType.AggregatorType)
+	assertions.Equal(SetAggregator, udfs[0].UdfType.AggregatorType)
 }
 
 func TestMacroProcessor_Agg_Generic(t *testing.T) {
@@ -69,7 +69,7 @@ func TestMacroProcessor_Agg_Generic(t *testing.T) {
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
 	assertions.NotEmpty(udfs[0].initial.(string))
-	assertions.Equal(GenericAggregator, udfs[0].udfType.AggregatorType)
+	assertions.Equal(GenericAggregator, udfs[0].UdfType.AggregatorType)
 }
 
 func TestMacroProcessor_Agg_Pivot_Generic(t *testing.T) {
@@ -80,8 +80,8 @@ func TestMacroProcessor_Agg_Pivot_Generic(t *testing.T) {
 	assertions.Equal(1, len(udfs))
 	assertions.NotEqual(s, tq)
 	assertions.NotEmpty(udfs[0].initial.(string))
-	assertions.Equal(GenericAggregator, udfs[0].udfType.AggregatorType)
-	assertions.True(udfs[0].udfType.Transpose)
+	assertions.Equal(GenericAggregator, udfs[0].UdfType.AggregatorType)
+	assertions.True(udfs[0].UdfType.Transpose)
 
 }
 

@@ -29,7 +29,7 @@ type ScriptUDF struct {
 	Body    string
 	Script  ScriptInstance
 	initial interface{}
-	udfType TypeOfUDF
+	UdfType TypeOfUDF
 }
 
 type Scriptable struct {
@@ -112,7 +112,7 @@ func FindAllUDFStrings(query string) ([][]string, error) {
 	return myRet, nil
 }
 
-func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
+func MacroProcessor(query string, funcNumStart int, langDialect string) (string, []ScriptUDF) {
 	list, _ := FindAllUDFStrings(query)
 	N := len(list)
 	if N == 0 {
@@ -153,8 +153,8 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 			k++
 		}
 		udfCall := fmt.Sprintf("%s(%s)", udfName, strings.Join(paramNames, ","))
-		udfArray[i] = ScriptUDF{Id: udfName, Script: GetScriptInstance("js", expr),
-			initial: initialAggregatorValue, udfType: udfType}
+		udfArray[i] = ScriptUDF{Id: udfName, Script: GetScriptInstance(langDialect, expr),
+			initial: initialAggregatorValue, UdfType: udfType}
 		retString = strings.Replace(retString, actual, udfCall, 1)
 	}
 	return retString, udfArray
@@ -259,7 +259,7 @@ func (a *Scriptable) Eval(ctx *sql.Context, buffer sql.Row) (interface{}, error)
 		return a.EvalScript(ctx, buffer, nil)
 	}
 	// now aggregated ....
-	if a.Meta.udfType.AggregatorType == SetAggregator {
+	if a.Meta.UdfType.AggregatorType == SetAggregator {
 		dataMap := buffer[0].(map[interface{}]bool)
 		retList := make([]interface{}, len(dataMap))
 		k := 0
@@ -280,7 +280,7 @@ func (a *Scriptable) WithChildren(children ...sql.Expression) (sql.Expression, e
 
 // NewBuffer implements AggregationExpression interface. (AggregationExpression)
 func (a *Scriptable) NewBuffer() sql.Row {
-	if a.Meta.udfType.AggregatorType == GenericAggregator {
+	if a.Meta.UdfType.AggregatorType == GenericAggregator {
 		initExpr := a.Meta.initial.(string)
 		initExpr = initExpr[1 : len(initExpr)-1]
 		value, err := a.Meta.Script.EvalFromString(initExpr)
@@ -298,7 +298,7 @@ func (a *Scriptable) accumulate(ctx *sql.Context, buffer sql.Row, row sql.Row) e
 	if e != nil {
 		return e
 	}
-	switch a.Meta.udfType.AggregatorType {
+	switch a.Meta.UdfType.AggregatorType {
 	case ListAggregator:
 		arr := buffer[0].([]interface{})
 		arr = append(arr, res)

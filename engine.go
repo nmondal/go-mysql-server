@@ -3,7 +3,6 @@ package sqle
 import (
 	"errors"
 	"github.com/src-d/go-mysql-server/sql/expression/function/udf"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/metrics/discard"
@@ -108,14 +107,15 @@ func (e *Engine) RegisterUDF(scriptUDF udf.ScriptUDF) error {
 func (e *Engine) SQuery(
 	ctx *sql.Context,
 	query string,
+	scriptLang string,
 ) (sql.Schema, sql.RowIter, error) {
-	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs)
+	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs, scriptLang)
 	if customFunctions != nil {
 		// now fill up the UDFs...
 		pvtCount := 0
 		for i := 0; i < len(customFunctions); i++ {
-			if strings.HasPrefix(customFunctions[i].Id, "pvt_fold_") {
-				pvtCount++;
+			if customFunctions[i].UdfType.Transpose {
+				pvtCount++
 			}
 		}
 		if pvtCount > 1 {

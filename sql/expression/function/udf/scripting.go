@@ -3,8 +3,6 @@ package udf
 import (
 	"errors"
 	"fmt"
-	exprEval "github.com/antonmedv/expr"
-	"github.com/robertkrimen/otto"
 	"github.com/src-d/go-mysql-server/sql"
 	"reflect"
 	"regexp"
@@ -29,8 +27,8 @@ type TypeOfUDF struct {
 
 type ScriptUDF struct {
 	Id      string
-	Lang    string
 	Body    string
+	Script  ScriptInstance
 	initial interface{}
 	UdfType TypeOfUDF
 }
@@ -88,6 +86,7 @@ func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
 		i := strings.Index(macroStart, "#")
 		return macroStart[5 : i+1], typeOfUDF
 	default:
+		typeOfUDF.IsAggregator = false
 		typeOfUDF.AggregatorType = NotAnAggregator
 		// should not come here
 	}
@@ -153,7 +152,8 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 			k++
 		}
 		udfCall := fmt.Sprintf("%s(%s)", udfName, strings.Join(paramNames, ","))
-		udfArray[i] = ScriptUDF{Id: udfName, Lang: "js", Body: expr, initial: initialAggregatorValue, UdfType: udfType}
+		udfArray[i] = ScriptUDF{Id: udfName, Script: GetScriptInstance("js", expr),
+			initial: initialAggregatorValue, UdfType: udfType}
 		retString = strings.Replace(retString, actual, udfCall, 1)
 	}
 	return retString, udfArray
@@ -183,12 +183,28 @@ func CanBeVariableName(s string) (bool, []string) {
 }
 
 func (a *Scriptable) EvalScript(ctx *sql.Context, row sql.Row, partial interface{}) (interface{}, error) {
-	switch a.Meta.Lang {
-	case "expr":
-		return a.__expr(ctx, row, partial)
-	default:
-		return a.__js(ctx, row, partial)
+	myArgs, params, e := a.__createArgs(ctx, row)
+	if e != nil {
+		return nil, e
 	}
+	// setup the environment
+	env := make(map[string]interface{})
+	// put named parameters back
+	for k, v := range params {
+		env[k] = v
+	}
+	// rest of the world
+	env["$ROW"] = row
+	env["$CONTEXT"] = ctx
+	env["$ARGS"] = myArgs
+	if partial != nil {
+		env["$_"] = partial
+	}
+	value, err := a.Meta.Script.ScriptEval(env)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
 }
 
 func (a *Scriptable) __createArgs(ctx *sql.Context, row sql.Row) ([]interface{}, map[string]map[string]interface{}, error) {
@@ -214,56 +230,6 @@ func (a *Scriptable) __createArgs(ctx *sql.Context, row sql.Row) ([]interface{},
 		}
 	}
 	return myArgs, params, nil
-}
-
-func (a *Scriptable) __js(ctx *sql.Context, row sql.Row, partial interface{}) (interface{}, error) {
-	myArgs, params, e := a.__createArgs(ctx, row)
-	if e != nil {
-		return nil, e
-	}
-	vm := otto.New()
-	// put named parameters back
-	for k, v := range params {
-		_ = vm.Set(k, v)
-	}
-	// rest of the world
-	_ = vm.Set("$ROW", row)
-	_ = vm.Set("$CONTEXT", ctx)
-	_ = vm.Set("$", myArgs)
-	if partial != nil {
-		_ = vm.Set("$_", partial)
-	}
-	value, err := vm.Run(a.Meta.Body)
-	if err != nil {
-		return nil, err
-	}
-	exportedValue, _ := value.Export()
-	return exportedValue, nil
-}
-
-func (a *Scriptable) __expr(ctx *sql.Context, row sql.Row, partial interface{}) (interface{}, error) {
-	myArgs, params, e := a.__createArgs(ctx, row)
-	if e != nil {
-		return nil, e
-	}
-	// setup the environment
-	env := make(map[string]interface{})
-	// put named parameters back
-	for k, v := range params {
-		env[k] = v
-	}
-	// rest of the world
-	env["_ROW"] = row
-	env["_CONTEXT"] = ctx
-	env["_A"] = myArgs
-	if partial != nil {
-		env["_p"] = partial
-	}
-	value, err := exprEval.Eval(a.Meta.Body, env)
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
 }
 
 func (a *Scriptable) String() string {
@@ -311,27 +277,12 @@ func (a *Scriptable) WithChildren(children ...sql.Expression) (sql.Expression, e
 	return &Scriptable{args: children, Meta: a.Meta}, nil
 }
 
-func (a *Scriptable) __initExpr(initExpr string) (interface{}, error) {
-	switch a.Meta.Lang {
-	case "expr":
-		return exprEval.Eval(initExpr, map[string]interface{}{})
-	default:
-		jsVM := otto.New()
-		value, e := jsVM.Run(initExpr)
-		if e != nil {
-			return nil, e
-		}
-		v, _ := value.Export()
-		return v, nil
-	}
-}
-
 // NewBuffer implements AggregationExpression interface. (AggregationExpression)
 func (a *Scriptable) NewBuffer() sql.Row {
 	if a.Meta.UdfType.AggregatorType == GenericAggregator {
 		initExpr := a.Meta.initial.(string)
 		initExpr = initExpr[1 : len(initExpr)-1]
-		value, err := a.__initExpr(initExpr)
+		value, err := a.Meta.Script.EvalFromString(initExpr)
 		if err != nil {
 			fmt.Printf("Invalid Expression for Aggregate query '%s' \n", initExpr)
 		} else {

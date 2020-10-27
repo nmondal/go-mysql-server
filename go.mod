@@ -4,6 +4,7 @@ require (
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
 	github.com/antonmedv/expr v1.8.9
+	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/go-kit/kit v0.8.0
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/go-sql-driver/mysql v1.4.1

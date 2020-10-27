@@ -57,7 +57,7 @@ func TestGeneric_Agg_Factorial(t *testing.T) {
 	rows, e := runAutoUDFEnabledQuery(query, engine, ctx)
 	assertions.Equal(nil, e)
 	assertions.Equal(1, len(rows))
-	finalRow := rows[0][0].([]int64)
+	finalRow := rows[0][0].([]interface{})
 	assertions.Equal(int64(4), finalRow[0])
 	assertions.Equal(int64(24), finalRow[1])
 	// do it JSON style ?
@@ -68,8 +68,8 @@ func TestGeneric_Agg_Factorial(t *testing.T) {
 	finalJSONRow := rows[0][0].(map[string]interface{})
 	assertions.Equal(2, len(finalJSONRow))
 	// TODO find out what is going wrong here? This should not be float...
-	assertions.Equal(float64(4), finalJSONRow["i"])
-	assertions.Equal(float64(24), finalJSONRow["f"])
+	assertions.Equal(int64(4), finalJSONRow["i"])
+	assertions.Equal(int64(24), finalJSONRow["f"])
 }
 
 func TestGeneric_UDFS(t *testing.T) {
@@ -92,7 +92,7 @@ func TestGeneric_Agg_Collector(t *testing.T) {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT <?LST@ x = { 'n' : @{mytable.name} , 'm' : @{mytable.email} }; ?>  FROM mytable"
+	query := "SELECT <?L__@ x = { 'n' : @{mytable.name} , 'm' : @{mytable.email} }; ?>  FROM mytable"
 	rows, e := runAutoUDFEnabledQuery(query, engine, ctx)
 	assertions.Equal(nil, e)
 	assertions.Equal(1, len(rows))
@@ -100,10 +100,29 @@ func TestGeneric_Agg_Collector(t *testing.T) {
 	assertions.Equal(4, len(finalRow))
 
 	// do it SET ?
-	query = "SELECT <?SET@ @{mytable.name} ?>  FROM mytable"
+	query = "SELECT <?S__@ @{mytable.name} ?>  FROM mytable"
 	rows, e = runAutoUDFEnabledQuery(query, engine, ctx)
 	assertions.Equal(nil, e)
 	assertions.Equal(1, len(rows))
 	finalRow = rows[0][0].([]interface{})
 	assertions.Equal(3, len(finalRow))
+}
+
+func TestGeneric_Agg_Collector_Transpose(t *testing.T) {
+	assertions := require.New(t)
+	engine := NewDefault()
+	engine.AddDatabase(createTestDatabase())
+	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
+	// now query
+	ctx := sql.NewEmptyContext()
+	query := "SELECT <?L_T@ x = { 'n' : @{mytable.name} , 'm' : @{mytable.email} }; ?>  FROM mytable"
+	rows, e := runAutoUDFEnabledQuery(query, engine, ctx)
+	assertions.Equal(nil, e)
+	assertions.Equal(4, len(rows))
+
+	// do it SET ?
+	query = "SELECT <?S_T@ @{mytable.name} ?>  FROM mytable"
+	rows, e = runAutoUDFEnabledQuery(query, engine, ctx)
+	assertions.Equal(nil, e)
+	assertions.Equal(3, len(rows))
 }

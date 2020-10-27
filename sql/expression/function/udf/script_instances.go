@@ -85,21 +85,26 @@ type V8EcmaScript6 struct {
 	ctx  *v8go.Context
 }
 
-func (v8Instance *V8EcmaScript6) EvalFromString(expressionString string) (interface{}, error) {
-	value, e := v8Instance.ctx.RunScript(expressionString, "")
+func (v8Instance *V8EcmaScript6) eval(someE6String string) (interface{}, error) {
+	value, e := v8Instance.ctx.RunScript(someE6String, "")
 	if e != nil {
 		return nil, e
 	}
 	var finalVal interface{}
-	e = json.Unmarshal([]byte(value.String()), &finalVal)
+	debugString := value.String()
+	e = json.Unmarshal([]byte(debugString), &finalVal)
 	if e != nil {
 		return nil, e
 	}
 	return finalVal, nil
 }
 
-func (v8Instance *V8EcmaScript6) ScriptEval(scriptEnvironment map[string]interface{}) (interface{}, error) {
+func (v8Instance *V8EcmaScript6) EvalFromString(expressionString string) (interface{}, error) {
+	jsonRetExpr := fmt.Sprintf("__input__ =  %s ; JSON.stringify(__input__);", expressionString)
+	return v8Instance.eval(jsonRetExpr)
+}
 
+func (v8Instance *V8EcmaScript6) ScriptEval(scriptEnvironment map[string]interface{}) (interface{}, error) {
 	// create the marshalling mechanism ...
 	finalScript := "function __anon__(){ "
 	for name := range scriptEnvironment {
@@ -109,8 +114,8 @@ func (v8Instance *V8EcmaScript6) ScriptEval(scriptEnvironment map[string]interfa
 		}
 		finalScript = fmt.Sprintf("%s\nlet %s = %s; ", finalScript, name, v)
 	}
-	finalScript = fmt.Sprintf("%s\n return %s \n} __anon__();", finalScript, v8Instance.body)
-	return v8Instance.EvalFromString(finalScript)
+	finalScript = fmt.Sprintf("%s\n return %s \n}  JSON.stringify(__anon__());", finalScript, v8Instance.body)
+	return v8Instance.eval(finalScript)
 }
 
 func (v8Instance *V8EcmaScript6) Dialect() string { return "V8EcmaScript6" }

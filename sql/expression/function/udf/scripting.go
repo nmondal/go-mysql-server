@@ -114,7 +114,7 @@ func FindAllUDFStrings(query string) ([][]string, error) {
 	return myRet, nil
 }
 
-func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
+func MacroProcessor(query string, funcNumStart int, langDialect string) (string, []ScriptUDF) {
 	list, _ := FindAllUDFStrings(query)
 	N := len(list)
 	if N == 0 {
@@ -152,7 +152,7 @@ func MacroProcessor(query string, funcNumStart int) (string, []ScriptUDF) {
 			k++
 		}
 		udfCall := fmt.Sprintf("%s(%s)", udfName, strings.Join(paramNames, ","))
-		udfArray[i] = ScriptUDF{Id: udfName, Script: GetScriptInstance("js", expr),
+		udfArray[i] = ScriptUDF{Id: udfName, Script: GetScriptInstance(langDialect, expr),
 			initial: initialAggregatorValue, UdfType: udfType}
 		retString = strings.Replace(retString, actual, udfCall, 1)
 	}

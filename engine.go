@@ -107,8 +107,9 @@ func (e *Engine) RegisterUDF(scriptUDF udf.ScriptUDF) error {
 func (e *Engine) SQuery(
 	ctx *sql.Context,
 	query string,
+	scriptLang string,
 ) (sql.Schema, sql.RowIter, error) {
-	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs)
+	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs, scriptLang)
 	if customFunctions != nil {
 		// now fill up the UDFs...
 		transposeCount := 0

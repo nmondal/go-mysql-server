@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+const (
+	defaultDialect = "js"
+)
+
 func createTestDatabase() *memory.Database {
 	const (
 		dbName    = "mydb"
@@ -33,7 +37,7 @@ func createTestDatabase() *memory.Database {
 }
 
 func runAutoUDFEnabledQuery(query string, engine *Engine, ctx *sql.Context) ([]sql.Row, error) {
-	_, it, e := engine.SQuery(ctx, query)
+	_, it, e := engine.SQuery(ctx, query, defaultDialect)
 	if e != nil {
 		fmt.Println("Error !!! ")
 		fmt.Println(e)

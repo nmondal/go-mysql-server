@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/src-d/go-mysql-server/sql"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -37,7 +38,7 @@ type Scriptable struct {
 	args []sql.Expression
 }
 
-var AggregatorRegex = regexp.MustCompile(`^<\?[A-Z_]{3}@.+`)
+var AggregatorRegex = regexp.MustCompile(`^<\?([LS][F_][T_])|(AG[GT])@.+`)
 
 // within UDF this does parameter extraction
 var ParamRegex = regexp.MustCompile(`@{([^(@{)^}]+)}`)
@@ -62,6 +63,7 @@ func AggregatorType(macroStart string) (interface{}, TypeOfUDF) {
 		return nil, typeOfUDF
 	}
 	typeOfUDF.IsAggregator = true
+
 	identifier := macroStart[2:5]
 
 	if identifier[1] == 'F' {
@@ -133,9 +135,6 @@ func MacroProcessor(query string, funcNumStart int, langDialect string) (string,
 			}
 			expr = expr[prefixInx:]
 			udfName = "fold" + udfName
-			if udfType.Transpose {
-				udfName = "pvt_" + udfName
-			}
 		}
 
 		myParams := ParamRegex.FindAllStringSubmatch(expr, -1)
@@ -294,23 +293,50 @@ func (a *Scriptable) NewBuffer() sql.Row {
 }
 
 func (a *Scriptable) accumulate(ctx *sql.Context, buffer sql.Row, row sql.Row) error {
-	res, e := a.EvalScript(ctx, row, buffer[0])
+	res, e := a.getData(ctx, buffer, row)
 	if e != nil {
 		return e
 	}
 	switch a.Meta.UdfType.AggregatorType {
 	case ListAggregator:
 		arr := buffer[0].([]interface{})
-		arr = append(arr, res)
+		for _, v := range res {
+			arr = append(arr, v)
+		}
 		buffer[0] = arr
 	case SetAggregator:
 		dataMap := buffer[0].(map[interface{}]bool)
-		dataMap[res] = true
+		for _, v := range res {
+			dataMap[v] = true
+		}
 		buffer[0] = dataMap
 	default:
-		buffer[0] = res
+		buffer[0] = res[0]
 	}
 	return nil
+}
+
+// Evaluates script and flattens the data if the Flatten flag is set
+func (a *Scriptable) getData(ctx *sql.Context, buffer sql.Row, row sql.Row) ([]interface{}, error) {
+	res, e := a.EvalScript(ctx, row, buffer[0])
+	if e != nil {
+		return nil, e
+	}
+	var data []interface{}
+	if a.Meta.UdfType.Flatten && res != nil {
+		switch val := reflect.ValueOf(res); val.Type().Kind() {
+		case reflect.Slice:
+			for i := 0; i < val.Len(); i++ {
+				v := val.Index(i)
+				data = append(data, v.Interface())
+			}
+		default:
+			data = append(data, res)
+		}
+	} else {
+		data = append(data, res)
+	}
+	return data, nil
 }
 
 // Update implements AggregationExpression interface. (AggregationExpression)

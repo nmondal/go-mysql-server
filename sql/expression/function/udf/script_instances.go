@@ -1,12 +1,9 @@
 package udf
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
-	"github.com/dop251/goja"
-	"rogchap.com/v8go"
+	"github.com/robertkrimen/otto"
 )
 
 type ScriptInstance interface {
@@ -45,40 +42,48 @@ func (exprInstance *ExprScriptInstance) Body() string { return exprInstance.body
 
 type JSScriptInstance struct {
 	body     string
-	runtTime *goja.Runtime
-	program  *goja.Program
+	runtTime *otto.Otto
+	script   *otto.Script
 }
 
 func (jsScriptInstance *JSScriptInstance) EvalFromString(expressionString string) (interface{}, error) {
-	value, e := jsScriptInstance.runtTime.RunString(expressionString)
+	value, e := jsScriptInstance.runtTime.Run(expressionString)
 	if e != nil {
 		return nil, e
 	}
-	return value.Export(), nil
+	exportedValue, _ := value.Export()
+	return exportedValue, nil
 }
 
 func (jsScriptInstance *JSScriptInstance) ScriptEval(scriptEnvironment map[string]interface{}) (interface{}, error) {
-	if jsScriptInstance.program == nil {
-		p, e := goja.Compile("_js_", jsScriptInstance.body, false)
+	if jsScriptInstance.script == nil {
+		s, e := jsScriptInstance.runtTime.Compile("_js_", jsScriptInstance.body)
 		if e != nil {
 			return nil, e
 		}
-		jsScriptInstance.program = p
+		jsScriptInstance.script = s
 	}
 	// setup the params ???
 	for name := range scriptEnvironment {
 		jsScriptInstance.runtTime.Set(name, scriptEnvironment[name])
 	}
-	value, e := jsScriptInstance.runtTime.RunProgram(jsScriptInstance.program)
+	value, e := jsScriptInstance.runtTime.Run(jsScriptInstance.script)
 	if e != nil {
 		return nil, e
 	}
-	return value.Export(), nil
+	exportedValue, _ := value.Export()
+	return exportedValue, nil
 }
 
 func (jsScriptInstance *JSScriptInstance) Dialect() string { return "ECMAScript5.1" }
 
 func (jsScriptInstance *JSScriptInstance) Body() string { return jsScriptInstance.body }
+
+
+/**
+This is for integrating the v8 engine, but it is currently causing problems. Hence removing it. But we can explore this
+at a later time.
+**
 
 type V8EcmaScript6 struct {
 	body string
@@ -121,15 +126,16 @@ func (v8Instance *V8EcmaScript6) ScriptEval(scriptEnvironment map[string]interfa
 func (v8Instance *V8EcmaScript6) Dialect() string { return "V8EcmaScript6" }
 
 func (v8Instance *V8EcmaScript6) Body() string { return v8Instance.body }
+*/
 
 func GetScriptInstance(langString string, bodyString string) ScriptInstance {
 	switch langString {
 	case "expr":
 		return &ExprScriptInstance{body: bodyString}
-	case "v8":
-		ctx, _ := v8go.NewContext(nil)
-		return &V8EcmaScript6{ctx: ctx, body: bodyString}
+	//case "v8":
+	//	ctx, _ := v8go.NewContext(nil)
+	//	return &V8EcmaScript6{ctx: ctx, body: bodyString}
 	default:
-		return &JSScriptInstance{runtTime: goja.New(), body: bodyString}
+		return &JSScriptInstance{runtTime: otto.New(), body: bodyString}
 	}
 }

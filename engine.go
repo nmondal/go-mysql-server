@@ -112,13 +112,13 @@ func (e *Engine) SQuery(
 	processedQuery, customFunctions := udf.MacroProcessor(query, e.NumCustomUdfs, scriptLang)
 	if customFunctions != nil {
 		// now fill up the UDFs...
-		pvtCount := 0
+		transposeCount := 0
 		for i := 0; i < len(customFunctions); i++ {
 			if customFunctions[i].UdfType.Transpose {
-				pvtCount++
+				transposeCount++;
 			}
 		}
-		if pvtCount > 1 {
+		if transposeCount > 1 {
 			return nil, nil, errors.New("Cannot have more than one pivot agg udf.")
 		}
 		for i := 0; i < len(customFunctions); i++ {

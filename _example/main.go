@@ -30,10 +30,9 @@ func main() {
 	engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 	// now query
 	ctx := sql.NewEmptyContext()
-	query := "SELECT <?SFT@ @{mytable.phone_numbers} ?> FROM mytable"
+	query := "SELECT <? @{mytable.phone_numbers}.length ?> FROM mytable WHERE <? @{mytable.phone_numbers}.length ?> = 0 "
+	//query := "SELECT ltrim(mytable.name)  FROM mytable WHERE length(mytable.name)!= 0 "
 	runAutoUDFEnabledQuery(query, engine, ctx)
-	//runAutoUDFEnabledQuery("SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable", engine, ctx)
-	//testAutoUDF()
 }
 
 func runAutoUDFEnabledQuery(query string, engine *sqle.Engine, ctx *sql.Context) {

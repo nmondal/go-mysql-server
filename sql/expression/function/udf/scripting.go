@@ -237,6 +237,12 @@ func (a *Scriptable) String() string {
 
 // Resolved implements AggregationExpression interface. (AggregationExpression[Expression[Resolvable]]])
 func (a *Scriptable) Resolved() bool {
+	// everyone should be resolved!!!! This was the issue!!!
+	for i := 0; i < len(a.args); i++ {
+		if !a.args[i].Resolved() {
+			return false
+		}
+	}
 	return true
 }
 

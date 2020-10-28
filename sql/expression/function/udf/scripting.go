@@ -27,7 +27,6 @@ type TypeOfUDF struct {
 
 type ScriptUDF struct {
 	Id      string
-	Body    string
 	Script  ScriptInstance
 	initial interface{}
 	UdfType TypeOfUDF

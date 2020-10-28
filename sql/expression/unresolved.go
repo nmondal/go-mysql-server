@@ -37,13 +37,13 @@ func (*UnresolvedColumn) Resolved() bool {
 }
 
 // IsNullable implements the Expression interface.
-func (*UnresolvedColumn) IsNullable() bool {
-	panic("unresolved column is a placeholder node, but IsNullable was called")
+func (uc *UnresolvedColumn) IsNullable() bool {
+	panic(fmt.Sprintf("unresolved column '%s' is a placeholder node, but IsNullable was called", uc.String()))
 }
 
 // Type implements the Expression interface.
-func (*UnresolvedColumn) Type() sql.Type {
-	panic("unresolved column is a placeholder node, but Type was called")
+func (uc *UnresolvedColumn) Type() sql.Type {
+	panic(fmt.Sprintf("unresolved column '%s' is a placeholder node, but Type was called", uc.String()))
 }
 
 // Name implements the Nameable interface.

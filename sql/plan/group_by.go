@@ -208,6 +208,10 @@ func (i *groupByIter) Next() (sql.Row, error) {
 			return row, err
 		}
 		i.eRows.rows = expandRow(row, i.aggregate)
+		if len(i.eRows.rows) == 0 {
+			i.done = true
+			return nil, io.EOF
+		}
 	}
 
 	row := i.eRows.rows[i.eRows.currentInd]

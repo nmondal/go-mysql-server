@@ -1,17 +1,24 @@
 # JSQL
 
-This is part of the larger initiative to stop custom coding for all business rules and calling them micro-services. If people want, they can call these a **pico-service** design pattern.
+This is part of the larger initiative to stop custom coding for all business rules. 
 
 ![quis=persona; quid=factum; cur=causa; ubi=locus; quando=tempus; quemadmodum = modus; quib/adminiculis=facultas](https://upload.wikimedia.org/wikipedia/commons/4/41/Victorinus.gif)
 
 ## Why?
 
-Because no developer should ever code for trivial business logic. It always starts with "just this much" and then before you notice it, whole business logic is embedded into your server source code which people "refactor" from monolith and start taking about "micro-service-architecture".  Hence the goals are:
+**Because  developers should never code business logic inside application source code.** 
 
-1. Removal of data processing business logic from "hard" source code 
+It always starts with "just this much" and then before anyone notices it, whole business logic is embedded into source code which people "refactor" from monolith and get into "micro-service-architecture".  
+
+This is how one can do micro-services in the right way (by ) composition over inheritance. 
+
+**Goals** for the JSQL macro embedding are:
+
+1. Removal of data processing business logic from "hard" source code to put into "soft" configuration code 
 2. Put them into dynamic configuration 
 3. Domain Specific ( SQL ) like configuration 
-4. All Aggregator service & all micro services should be written as configuration - known as pico-service : p-Service. "P" quite literally can be stand for "pico" or "profitable" in terms fo ROI.
+4. All Aggregator service & all micro services should be written as configuration
+5. Increase in testability 
 
 `GO` was used to create this infrastructure, because `GO` is the language for infrastructure. Reasonably low level, and reasonably fast. `RUST` could have been used - but lack of suitable first class libraries ( `RUST` does not have a **SQL Engine** Implementation ).
 
@@ -24,7 +31,7 @@ Where delivery speed matters.
    1. Adding feature takes time
    2. Fixing bugs takes time 
 3. Business people to maintain the business logic 
-4. Business logic is completely out of the code 
+4. Business logic is completely out of the code - and can be maintained as configuration with suitable UI to edit.
 
 
 
@@ -48,7 +55,9 @@ Hence the problem is divided into 3 parts:
 
 There is only one ubiquitous language for data processing : `SQL`.  This has been tried many times, `PIG` for `Hadoop`. Specifically yahoo did `YQL`. 
 
-But that is one part of the problem. There is a major part of programmability - that is Turing Completeness. Neither `SQL` or `GraphQL` is Turing Complete - and hence is unusable for this purpose.
+But that is one part of the problem. There is a major part of programmability - that is Turing Completeness. Neither `SQL` or `GraphQL` is Turing Complete - and hence is unusable for generic aggregation purpose. 
+
+Observe the tiny problem of GraphQL unable to evaluate arbitrary expression - that is solved by .
 
 ### Part of the Solution 
 
@@ -83,7 +92,7 @@ engine.AddDatabase(sql.NewInformationSchemaDatabase(engine.Catalog))
 ctx := sql.NewEmptyContext()
 // this is where the macro comes in
 query := "SELECT  <? @{mytable.phone_numbers}.length ?> FROM mytable"
-_, it, e := engine.SQuery(ctx, query)	
+_, it, e := engine.SQuery(ctx, query, "js") // tell the embedding language too 	
 ```
 
 This produce, as expected a list `[1,0,0,2]` .
@@ -93,16 +102,17 @@ What is really happening under the hood? The macro is being parsed ( notice the 
 Naturally all these are open APIs ( extensions created) :
 
 ```go
-// run macro processor 
-processedQuery, customFunctions := udf.MacroProcessor(query)
+// run macro processor : query string, id of the udf, language of the embdedding 
+processedQuery, customFunctions := udf.MacroProcessor(query, 0, "js")
 // Register them...
 _ = engine.RegisterUDF(customFunctions[i])
 ```
 
-One can naturally create custom UDF by hand too:
+One can  create custom UDF by hand too:
 
 ```go
-someUDF := ScriptUDF{Id: "my_name", Lang: "js", Body: expr}
+someUDF := ScriptUDF{Id: udfName, Script: GetScriptInstance(langDialect, expr),
+			initial: initialAggregatorValue, UdfType: udfType}
 _ = engine.RegisterUDF(someUDF)
 ```
 
@@ -126,22 +136,93 @@ function _auto_1_udf_( phone_numbers ){
 } 
 ```
 
+
+
 Given the MySQL implementation automatically using `JSON` type, the UDF response is JSON type. Hence using macro enabled language - one can easily query nested `JSON` as well as array. 
+
+### Specific Injected Variables 
+
+The following variables are injected automatically as of now:
+
+```go
+/* 
+Function which handles scripting 
+ctx SQL context 
+row is a typically an array of values - input
+partial is accumulator value as of now ( for aggregation )
+*/
+func (a *Scriptable) EvalScript(ctx *sql.Context, row sql.Row, partial interface{}) (interface{}, error) 
+```
+
+| Variable in GO Engine                   | Script Variable | Explanation       |
+| --------------------------------------- | --------------- | ----------------- |
+| `row`                                   | `$ROW`          | Row or Input      |
+| `ctx`                                   | `$CONTEXT`      | SQL Context       |
+| Function parameters ( If not Anonymous) | `$ARGS`         | -                 |
+| Accumulation partial value              | `$_`            | Accumulator Value |
+
+
+
+### Specific Aggregation in Accumulator 
 
 There are aggregators too.  This is defined, naturally by :
 
 ```sql
 -- this is how you use SET accumulator 
-SELECT  <?SET@ @{mytable.phone_numbers}.length ?> FROM mytable
+SELECT  <?S__@ @{mytable.phone_numbers}.length ?> FROM mytable
 -- this is how you use LIST accumulator 
-SELECT  <?LST@ @{mytable.phone_numbers}.length ?> FROM mytable
+SELECT  <?L__@ @{mytable.phone_numbers}.length ?> FROM mytable
 ```
+
+Notice the basic idea. It is specifically defined as `<?XXX@` syntax. 
+
+### Flatten & Transpose 
+
+In many cases the nested query will be used to generate a list of options. This is exactly where "flatten" and "transpose" comes in.
+
+Flatten is pretty simple idea, you have a nested collection and you reduce the nested collection to a flattened collection:
+
+```js
+nf = [1,2,[3,4],5,6] ;
+f = flatten(nf);
+//f = [1,2,3,4,5,6]
+```
+
+This is achieved via setting the 2nd character of the aggregators to `'F'`. 
+
+SQL transpose is achieved via PIVOT, which our mysql go server did not support, so we wrote one, and gave a hook to the macro processor to PIVOT. 
+
+ This is achieved via setting the 3rd character of the aggregators to `'T'`. 
+
+Thus the whole specification of aggregation over flatter and transpose is given by the matrix:
+
+```go
+/**
+Let's define the protocol : Here
+L__ -> List, no flatten, no transpose
+L_T -> List, no flatten, Transpose
+LFT -> List, flatten, Transpose
+
+S__ -> Set, no flatten, no transpose
+S_T -> Set, no flatten, Transpose
+SFT -> Set, flatten, Transpose
+
+--> AGG can not have flatten it is upto author
+AGG -> Aggregate, no flatten, no transpose
+AGT -> AGG, no flatten, Transpose
+*/
+
+```
+
+### Generic Aggregation 
 
 And, then there is a generic **FOLD**. Here is some code that calculates factorial on the number of rows of the table! 
 
 ```sql
 SELECT  <?AGG@ [0,1] /* initial expression */ # $_[0] += 1 ; $_[1] *= $_[0] ; $_ ; /* expression body */ ?> FROM mytable
 ```
+
+Notice that the the extra `#` in the syntax of `<?AGX@ <init-expression>#`.  Anything between the `@` and the first `#` will be taken as the initial expression for the fold higher order function. 
 
 This is equivalent to the formal code of :
 
@@ -167,8 +248,6 @@ SELECT  <?AGG@ i={'i':0,'f':1}; # $_.i += 1 ; $_.f *= $_.i ; $_ ; ?> FROM mytabl
 
 
 
-
-
 ## Where ?
 
 This is suitable for replacing aggregation business logic, rather than innovation logic.  
@@ -181,23 +260,33 @@ Once the system is up - UI can be created so that business people can use it dir
 
 ## References
 
-1. Interestingly, there are very few useful books on what exactly are micro-services - and I am on the thanks section of some of them : https://www.amazon.in/Scala-Microservices-Jatin-Puri/dp/1786469340 
 
-2. Yahoo Query Language : https://en.wikipedia.org/wiki/Yahoo!_Query_Language
 
-3. LinkedIn ParSeq is a sample workflow system : https://github.com/linkedin/parseq 
+1. Yahoo Query Language : https://en.wikipedia.org/wiki/Yahoo!_Query_Language
 
-4. Reference implementation is here : https://github.com/nmondal/go-mysql-server/commits/master 
+2. LinkedIn ParSeq is a sample workflow system : https://github.com/linkedin/parseq 
 
-5. Aggregators : https://en.wikipedia.org/wiki/Aggregate_function 
+3. Reference implementation is here : https://github.com/nmondal/go-mysql-server/commits/master 
 
-6. FOLD : https://en.wikipedia.org/wiki/Fold_(higher-order_function) 
+4. Aggregators : https://en.wikipedia.org/wiki/Aggregate_function 
 
-7. Go De Facto JavaScript Engine : https://github.com/robertkrimen/otto 
+5. FOLD : https://en.wikipedia.org/wiki/Fold_(higher-order_function) 
 
-8. Apache PIG UDF : https://pig.apache.org/docs/r0.17.0/udf.html 
+6. SQL PIVOT : https://stackoverflow.com/questions/13372276/simple-way-to-transpose-columns-and-rows-in-sql 
 
-   
+7. FLATTEN : https://rosettacode.org/wiki/Flatten_a_list 
 
-   
+8. Go De Facto JavaScript Engine : https://github.com/robertkrimen/otto 
+
+9. Apache PIG UDF : https://pig.apache.org/docs/r0.17.0/udf.html 
+
+10. Is GraphQL The Future : https://artsy.github.io/blog/2018/05/08/is-graphql-the-future/ 
+
+11. Implementations of Field Resolvers : https://www.apollographql.com/docs/tutorial/resolvers/ 
+
+12. Interestingly, there are very few useful books on what exactly are micro-services - (I am on the thanks section of at least one of them) : https://www.amazon.in/Scala-Microservices-Jatin-Puri/dp/1786469340 
+
+     
+
+     
 
